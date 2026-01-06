@@ -240,9 +240,9 @@ async function startQasimDev() {
 
         const QasimDev = makeWASocket({
             version,
-            logger: pino({ level: 'silent' }),
+            logger: pino({ level: 'silent' }), // Keep silent logger to reduce noise
             printQRInTerminal: !pairingCode,
-            browser: Browsers.macOS('Chrome'),
+            browser: Browsers.ubuntu('Chrome'), // Better for Linux/PM2 servers
             auth: {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
@@ -250,6 +250,8 @@ async function startQasimDev() {
             markOnlineOnConnect: !isGhostActive,
             generateHighQualityLinkPreview: true,
             syncFullHistory: false,
+            retryRequestDelayMs: 5000, // Wait 5s before retrying failed requests
+            fireInitQueries: true, // Ensure we fire init queries on connect
             getMessage: async (key) => {
                 let jid = jidNormalizedUser(key.remoteJid);
                 let msg = await store.loadMessage(jid, key.id);
@@ -258,7 +260,7 @@ async function startQasimDev() {
             msgRetryCounterCache,
             defaultQueryTimeoutMs: 60000,
             connectTimeoutMs: 60000,
-            keepAliveIntervalMs: 10000,
+            keepAliveIntervalMs: 10000, // Aggressive keep-alive for stability
         });
 
         const originalSendPresenceUpdate = QasimDev.sendPresenceUpdate;
