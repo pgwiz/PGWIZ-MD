@@ -1,5 +1,18 @@
 /* process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; */
 
+// Suppress Baileys internal session debug logs
+const originalConsoleLog = console.log;
+console.log = (...args) => {
+    const msg = args[0];
+    if (typeof msg === 'string' && (msg.includes('Closing session') || msg.includes('SessionEntry'))) {
+        return; // Suppress Baileys session debug output
+    }
+    if (args[0] && typeof args[0] === 'object' && args[0].constructor?.name === 'SessionEntry') {
+        return; // Suppress SessionEntry object dumps
+    }
+    originalConsoleLog.apply(console, args);
+};
+
 require('./config');
 require('./settings');
 
@@ -15,7 +28,6 @@ const { imageToWebp, videoToWebp, writeExifImg, writeExifVid } = require('./lib/
 const { smsg, isUrl, generateMessageTag, getBuffer, getSizeMedia, fetch, await, sleep, reSize } = require('./lib/myfunc');
 const {
     default: makeWASocket,
-    useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion,
     generateForwardMessageContent,
@@ -42,6 +54,7 @@ const store = require('./lib/lightweight_store');
 const SaveCreds = require('./lib/session');
 const { app, server, PORT } = require('./lib/server');
 const { printLog } = require('./lib/print');
+const { useSQLiteAuthState } = require('./lib/sqliteAuthState');
 const {
     handleMessages,
     handleGroupParticipantUpdate,
@@ -212,7 +225,7 @@ async function startQasimDev() {
         ensureSessionDirectory();
         await delay(1000);
 
-        const { state, saveCreds } = await useMultiFileAuthState(`./session`);
+        const { state, saveCreds } = await useSQLiteAuthState();
         const msgRetryCounterCache = new NodeCache();
 
         const hasRegisteredCreds = state.creds && state.creds.registered !== undefined;
