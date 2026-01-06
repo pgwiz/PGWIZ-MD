@@ -139,7 +139,7 @@ module.exports = {
           isForwarded: true,
           forwardedNewsletterMessageInfo: {
             newsletterJid: '120363319098372999@newsletter',
-            newsletterName: settings.botName || 'MEGA MD',
+            newsletterName: settings.botName || 'PGWIZ-MD',
             serverMessageId: -1
           }
         }

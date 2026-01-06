@@ -14,7 +14,7 @@ const settings = {
   description: "This is a bot for managing group commands and automating tasks.",
   version: "5.1.0",
   updateZipUrl: "https://github.com/pgwiz/PGWIZ-MD/archive/refs/heads/main.zip",
-  channelLink: "https://whatsapp.com/channel/0029VagJIAr3bbVBCpEkAM07",
+  channelLink: "https://whatsapp.com/channel/0029Va8cpObHwXbDoZE9VY3K",
   ytch: "pgwiz"
 };
 

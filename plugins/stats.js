@@ -4,7 +4,7 @@
  *                                                                           *
  *  🌐  GitHub   : https://github.com/pgwiz                         *
  *  ▶️  YouTube  : https://youtube.com/@pgwiz                       *
- *  💬  WhatsApp : https://whatsapp.com/channel/0029VagJIAr3bbVBCpEkAM07     *
+ *  💬  WhatsApp : https://whatsapp.com/channel/0029Va8cpObHwXbDoZE9VY3K     *
  *                                                                           *
  *    © 2026 pgwiz. All rights reserved.                            *
  *                                                                           *
@@ -52,7 +52,7 @@ module.exports = {
           isForwarded: true,
           forwardedNewsletterMessageInfo: {
             newsletterJid: '120363319098372999@newsletter',
-            newsletterName: 'MEGA MD PERFORMANCE',
+            newsletterName: 'PGWIZ-MD PERFORMANCE',
             serverMessageId: -1
           }
         }
@@ -71,7 +71,7 @@ module.exports = {
  *                                                                           *
  *  🌐  GitHub   : https://github.com/pgwiz                         *
  *  ▶️  YouTube  : https://youtube.com/@pgwiz                       *
- *  💬  WhatsApp : https://whatsapp.com/channel/0029VagJIAr3bbVBCpEkAM07     *
+ *  💬  WhatsApp : https://whatsapp.com/channel/0029Va8cpObHwXbDoZE9VY3K     *
  *                                                                           *
  *    © 2026 pgwiz. All rights reserved.                            *
  *                                                                           *

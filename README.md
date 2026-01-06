@@ -2,7 +2,7 @@
 
 <div align="center"> 
   <a href="https://youtube.com/@pgwiz"> 
-    <img src="https://github.com/pgwiz/PGWIZ-MD/blob/main/assets/bot_image.jpg" alt="MEGA AI" height="300"> 
+    <img src="https://github.com/pgwiz/PGWIZ-MD/blob/main/assets/bot_image.jpg" alt="PGWIZ AI" height="300"> 
   </a> 
 </div>
 
@@ -29,7 +29,7 @@
 
 ### Step 1: Fork the Repository
 
-Click the button below to fork the Mega Md repository to your GitHub account:
+Click the button below to fork the PGWIZ-MD repository to your GitHub account:
 
 <div align="center">
   <a href="https://github.com/pgwiz/PGWIZ-MD/fork">
@@ -148,7 +148,7 @@ Easily connect to your WhatsApp account by pair code.
   <a href="https://t.me/GlobalTechBots">
     <img src="https://img.shields.io/badge/Join%20Telegram-0078E7?style=for-the-badge&logo=telegram&logoColor=white" alt="Join Telegram"/>
   </a>
-  <a href="https://whatsapp.com/channel/0029VagJIAr3bbVBCpEkAM07">
+  <a href="https://whatsapp.com/channel/0029Va8cpObHwXbDoZE9VY3K">
     <img src="https://img.shields.io/badge/Join%20WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="Join WhatsApp"/>
   </a>
 </div>
@@ -175,7 +175,7 @@ Easily connect to your WhatsApp account by pair code.
 
 ## About
 
-The MEGA AI WhatsApp Bot assists group admins by providing them with tools to efficiently manage large WhatsApp groups. The bot uses the Baileys library to interact with the WhatsApp Web API and supports multi-device features.
+The PGWIZ AI WhatsApp Bot assists group admins by providing them with tools to efficiently manage large WhatsApp groups. The bot uses the Baileys library to interact with the WhatsApp Web API and supports multi-device features.
 
 It is lightweight and can be easily customized to add more commands as per your requirements. The bot runs in a Node.js environment and provides QR code-based authentication to link your WhatsApp account.
 

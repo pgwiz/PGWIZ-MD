@@ -362,7 +362,7 @@ async function startQasimDev() {
                                 isForwarded: true,
                                 forwardedNewsletterMessageInfo: {
                                     newsletterJid: '120363319098372999@newsletter',
-                                    newsletterName: 'MEGA MD',
+                                    newsletterName: 'PGWIZ-MD',
                                     serverMessageId: -1
                                 }
                             }
@@ -510,7 +510,7 @@ async function startQasimDev() {
                             isForwarded: true,
                             forwardedNewsletterMessageInfo: {
                                 newsletterJid: '120363319098372999@newsletter',
-                                newsletterName: 'MEGA MD',
+                                newsletterName: 'PGWIZ-MD',
                                 serverMessageId: -1
                             }
                         }
@@ -590,7 +590,7 @@ async function startQasimDev() {
 
 
 async function main() {
-    printLog('info', 'Starting MEGA MD BOT...');
+    printLog('info', 'Starting PGWIZ-MD BOT...');
 
     const sessionReady = await initializeSession();
 
