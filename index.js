@@ -413,14 +413,14 @@ async function startQasimDev() {
         const isRegistered = state.creds?.registered === true;
         const hasValidMe = state.creds?.me?.id ? true : false;
 
-        // If we have a valid me.id, skip pairing and attempt connection
-        if (hasValidMe) {
-            printLog('info', `Session has me.id: ${state.creds.me.id} - attempting connection...`);
+        // Only skip pairing if BOTH me.id exists AND registered is true
+        if (hasValidMe && isRegistered) {
+            printLog('info', `Valid registered session: ${state.creds.me.id}`);
             if (rl && !rl.closed) {
                 rl.close();
                 rl = null;
             }
-        } else if (pairingCode && !isRegistered) {
+        } else if (pairingCode) {
             if (useMobile) throw new Error('Cannot use pairing code with mobile api');
 
             printLog('warning', 'Session not registered. Pairing code required');
