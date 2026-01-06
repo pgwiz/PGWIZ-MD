@@ -5,7 +5,10 @@
   "main": "index.js",
   "directories": {"lib": "lib","data": "data","plugins": "plugins"},
   "scripts": {
-  "start": "node index.js",
+  "start": "pm2 start index.js --name mega --update-env",
+  "stop": "pm2 stop mega",
+  "restart": "pm2 restart mega",
+  "logs": "pm2 logs mega",
   "dev": "nodemon index.js",
   "check": "node -e \"require('syntax-error'); console.log('Syntax checker ready')\"",
   "lint": "node test.js",

@@ -497,7 +497,7 @@ async function startQasimDev() {
                     console.log(chalk.gray('• No typing indicators'));
                 }
 
-                console.log(chalk.yellow(`🌿Connected to => ` + JSON.stringify(QasimDev.user, null, 2)));
+                // console.log(chalk.yellow(`🌿Connected to => ` + JSON.stringify(QasimDev.user, null, 2))); // Verbose
 
                 try {
                     const botNumber = QasimDev.user.id.split(':')[0] + '@s.whatsapp.net';
@@ -519,19 +519,20 @@ async function startQasimDev() {
                     printLog('error', `Failed to send connection message: ${error.message}`);
                 }
 
-                await delay(1999);
-                console.log(chalk.yellow(`\n\n                  ${chalk.bold.blue(`[ ${global.botname || 'PGWIZ-MD'} ]`)}\n\n`));
-                console.log(chalk.cyan(`< ================================================== >`));
-                console.log(chalk.magenta(`\n${global.themeemoji || '•'} YT CHANNEL: pgwiz`));
-                console.log(chalk.magenta(`${global.themeemoji || '•'} GITHUB: pgwiz`));
-                console.log(chalk.magenta(`${global.themeemoji || '•'} WA NUMBER: ${owner}`));
-                console.log(chalk.magenta(`${global.themeemoji || '•'} CREDIT: Qasim Ali`));
-                console.log(chalk.green(`${global.themeemoji || '•'} 🤖 Bot Connected Successfully! ✅`));
-                console.log(chalk.blue(`Bot Version: ${settings.version}`));
-                console.log(chalk.cyan(`Loaded Commands: ${commandHandler.commands.size}`));
-                console.log(chalk.cyan(`Prefixes: ${settings.prefixes.join(', ')}`));
-                console.log(chalk.gray(`Backend: ${store.getStats().backend}`));
-                console.log();
+                // Verbose startup banner disabled
+                // await delay(1999);
+                // console.log(chalk.yellow(`\n\n                  ${chalk.bold.blue(`[ ${global.botname || 'PGWIZ-MD'} ]`)}\n\n`));
+                // console.log(chalk.cyan(`< ================================================== >`));
+                // console.log(chalk.magenta(`\n${global.themeemoji || '•'} YT CHANNEL: pgwiz`));
+                // console.log(chalk.magenta(`${global.themeemoji || '•'} GITHUB: pgwiz`));
+                // console.log(chalk.magenta(`${global.themeemoji || '•'} WA NUMBER: ${owner}`));
+                // console.log(chalk.magenta(`${global.themeemoji || '•'} CREDIT: Qasim Ali`));
+                // console.log(chalk.green(`${global.themeemoji || '•'} 🤖 Bot Connected Successfully! ✅`));
+                // console.log(chalk.blue(`Bot Version: ${settings.version}`));
+                // console.log(chalk.cyan(`Loaded Commands: ${commandHandler.commands.size}`));
+                // console.log(chalk.cyan(`Prefixes: ${settings.prefixes.join(', ')}`));
+                // console.log(chalk.gray(`Backend: ${store.getStats().backend}`));
+                // console.log();
             }
 
             if (connection === 'close') {
