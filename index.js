@@ -42,11 +42,11 @@ const store = require('./lib/lightweight_store');
 const SaveCreds = require('./lib/session');
 const { app, server, PORT } = require('./lib/server');
 const { printLog } = require('./lib/print');
-const { 
-    handleMessages, 
-    handleGroupParticipantUpdate, 
+const {
+    handleMessages,
+    handleGroupParticipantUpdate,
     handleStatus,
-    handleCall 
+    handleCall
 } = require('./lib/messageHandler');
 
 const settings = require('./settings');
@@ -84,9 +84,9 @@ const useMobile = process.argv.includes("--mobile");
 
 let rl = null;
 if (process.stdin.isTTY && !process.env.PAIRING_NUMBER) {
-    rl = readline.createInterface({ 
-        input: process.stdin, 
-        output: process.stdout 
+    rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
     });
 }
 
@@ -122,32 +122,37 @@ function ensureSessionDirectory() {
 function hasValidSession() {
     try {
         const credsPath = path.join(__dirname, 'session', 'creds.json');
-        
+
         if (!existsSync(credsPath)) {
             return false;
         }
-        
+
         const fileContent = fs.readFileSync(credsPath, 'utf8');
         if (!fileContent || fileContent.trim().length === 0) {
             printLog('warning', 'creds.json exists but is empty');
             return false;
         }
-        
+
         try {
             const creds = JSON.parse(fileContent);
             if (!creds.noiseKey || !creds.signedIdentityKey || !creds.signedPreKey) {
                 printLog('warning', 'creds.json is missing required fields');
                 return false;
             }
+
+            // If we have valid keys and a me.id, accept the session
+            // Baileys will handle registration during connection
+            if (creds.me && creds.me.id) {
+                printLog('success', `Session found for ${creds.me.id} (registered: ${creds.registered})`);
+                return true;
+            }
+
             if (creds.registered === false) {
-                printLog('warning', 'Session credentials exist but are not registered');
-                try {
-                    rmSync(path.join(__dirname, 'session'), { recursive: true, force: true });
-                } catch (e) {}
+                printLog('warning', 'Session not registered and no me.id - will need pairing');
                 return false;
             }
-            
-            printLog('success', 'Valid and registered session credentials found');
+
+            printLog('success', 'Valid session credentials found');
             return true;
         } catch (parseError) {
             printLog('warning', 'creds.json contains invalid JSON');
@@ -161,7 +166,7 @@ function hasValidSession() {
 
 async function initializeSession() {
     ensureSessionDirectory();
-    
+
     const txt = global.SESSION_ID || process.env.SESSION_ID;
 
     if (!txt) {
@@ -173,15 +178,15 @@ async function initializeSession() {
         printLog('warning', 'No existing session found. Pairing code will be required');
         return false;
     }
-    
+
     if (hasValidSession()) {
         return true;
     }
-    
+
     try {
         await SaveCreds(txt);
         await delay(2000);
-        
+
         if (hasValidSession()) {
             printLog('success', 'Session file verified and valid');
             await delay(1000);
@@ -203,10 +208,10 @@ server.listen(PORT, () => {
 async function startQasimDev() {
     try {
         let { version, isLatest } = await fetchLatestBaileysVersion();
-        
+
         ensureSessionDirectory();
         await delay(1000);
-        
+
         const { state, saveCreds } = await useMultiFileAuthState(`./session`);
         const msgRetryCounterCache = new NodeCache();
 
@@ -215,7 +220,7 @@ async function startQasimDev() {
 
         const ghostMode = await store.getSetting('global', 'stealthMode');
         const isGhostActive = ghostMode && ghostMode.enabled;
-        
+
         if (isGhostActive) {
             printLog('info', '👻 STEALTH MODE IS ACTIVE - Starting in stealth mode');
         }
@@ -247,8 +252,8 @@ async function startQasimDev() {
         const originalReadMessages = QasimDev.readMessages;
         const originalSendReceipt = QasimDev.sendReceipt;
         const originalSendReadReceipt = QasimDev.sendReadReceipt;
-        
-        QasimDev.sendPresenceUpdate = async function(...args) {
+
+        QasimDev.sendPresenceUpdate = async function (...args) {
             const ghostMode = await store.getSetting('global', 'stealthMode');
             if (ghostMode && ghostMode.enabled) {
                 printLog('info', '👻 Blocked presence update (stealth mode)');
@@ -256,8 +261,8 @@ async function startQasimDev() {
             }
             return originalSendPresenceUpdate.apply(this, args);
         };
-        
-        QasimDev.readMessages = async function(...args) {
+
+        QasimDev.readMessages = async function (...args) {
             const ghostMode = await store.getSetting('global', 'stealthMode');
             if (ghostMode && ghostMode.enabled) {
                 return;
@@ -266,7 +271,7 @@ async function startQasimDev() {
         };
 
         if (originalSendReceipt) {
-            QasimDev.sendReceipt = async function(...args) {
+            QasimDev.sendReceipt = async function (...args) {
                 const ghostMode = await store.getSetting('global', 'stealthMode');
                 if (ghostMode && ghostMode.enabled) {
                     return;
@@ -274,9 +279,9 @@ async function startQasimDev() {
                 return originalSendReceipt.apply(this, args);
             };
         }
-        
+
         if (originalSendReadReceipt) {
-            QasimDev.sendReadReceipt = async function(...args) {
+            QasimDev.sendReadReceipt = async function (...args) {
                 const ghostMode = await store.getSetting('global', 'stealthMode');
                 if (ghostMode && ghostMode.enabled) {
                     return;
@@ -284,9 +289,9 @@ async function startQasimDev() {
                 return originalSendReadReceipt.apply(this, args);
             };
         }
-        
+
         const originalQuery = QasimDev.query;
-        QasimDev.query = async function(node, ...args) {
+        QasimDev.query = async function (node, ...args) {
             const ghostMode = await store.getSetting('global', 'stealthMode');
             if (ghostMode && ghostMode.enabled) {
                 if (node && node.tag === 'receipt') {
@@ -298,7 +303,7 @@ async function startQasimDev() {
             }
             return originalQuery.apply(this, [node, ...args]);
         };
-        
+
         QasimDev.isGhostMode = async () => {
             const ghostMode = await store.getSetting('global', 'stealthMode');
             return ghostMode && ghostMode.enabled;
@@ -306,14 +311,14 @@ async function startQasimDev() {
 
         QasimDev.ev.on('creds.update', saveCreds);
         store.bind(QasimDev.ev);
-        
+
         QasimDev.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const mek = chatUpdate.messages[0];
                 if (!mek.message) return;
-                
-                mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') 
-                    ? mek.message.ephemeralMessage.message 
+
+                mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage')
+                    ? mek.message.ephemeralMessage.message
                     : mek.message;
 
                 if (mek.key && mek.key.remoteJid === 'status@broadcast') {
@@ -393,7 +398,7 @@ async function startQasimDev() {
         QasimDev.serializeM = (m) => smsg(QasimDev, m, store);
 
         const isRegistered = state.creds?.registered === true;
-        
+
         if (pairingCode && !isRegistered) {
             if (useMobile) throw new Error('Cannot use pairing code with mobile api');
 
@@ -417,7 +422,7 @@ async function startQasimDev() {
             const pn = require('awesome-phonenumber');
             if (!pn('+' + phoneNumberInput).isValid()) {
                 printLog('error', 'Invalid phone number format');
-                
+
                 if (rl && !rl.closed) {
                     rl.close();
                 }
@@ -430,7 +435,7 @@ async function startQasimDev() {
                     code = code?.match(/.{1,4}/g)?.join("-") || code;
                     console.log(chalk.black(chalk.bgGreen(`Your Pairing Code : `)), chalk.black(chalk.white(code)));
                     printLog('success', `Pairing code generated: ${code}`);
-                    
+
                     if (rl && !rl.closed) {
                         rl.close();
                         rl = null;
@@ -454,32 +459,32 @@ async function startQasimDev() {
 
         QasimDev.ev.on('connection.update', async (s) => {
             const { connection, lastDisconnect, qr } = s;
-            
+
             if (qr) {
                 printLog('info', 'QR Code generated. Please scan with WhatsApp');
             }
-            
+
             if (connection === 'connecting') {
                 printLog('connection', 'Connecting to WhatsApp...');
             }
-            
+
             if (connection == "open") {
                 printLog('success', 'Bot connected successfully!');
                 const { startAutoBio } = require('./plugins/a-setbio');
-                startAutoBio(QasimDev); 
+                startAutoBio(QasimDev);
                 const ghostMode = await store.getSetting('global', 'stealthMode');
                 if (ghostMode && ghostMode.enabled) {
                     printLog('info', '👻 STEALTH MODE ACTIVE - Bot is in stealth mode');
                     console.log(chalk.gray('• No online status'));
                     console.log(chalk.gray('• No typing indicators'));
                 }
-                
+
                 console.log(chalk.yellow(`🌿Connected to => ` + JSON.stringify(QasimDev.user, null, 2)));
 
                 try {
                     const botNumber = QasimDev.user.id.split(':')[0] + '@s.whatsapp.net';
                     const ghostStatus = (ghostMode && ghostMode.enabled) ? '\n👻 Stealth Mode: ACTIVE' : '';
-                    
+
                     await QasimDev.sendMessage(botNumber, {
                         text: `🤖 Bot Connected Successfully!\n\n⏰ Time: ${new Date().toLocaleString()}\n✅ Status: Online and Ready!${ghostStatus}\n\n✅Make sure to join below channel`,
                         contextInfo: {
@@ -496,7 +501,7 @@ async function startQasimDev() {
                     printLog('error', `Failed to send connection message: ${error.message}`);
                 }
 
-                 await delay(1999);
+                await delay(1999);
                 console.log(chalk.yellow(`\n\n                  ${chalk.bold.blue(`[ ${global.botname || 'PGWIZ-MD'} ]`)}\n\n`));
                 console.log(chalk.cyan(`< ================================================== >`));
                 console.log(chalk.magenta(`\n${global.themeemoji || '•'} YT CHANNEL: pgwiz`));
@@ -510,13 +515,13 @@ async function startQasimDev() {
                 console.log(chalk.gray(`Backend: ${store.getStats().backend}`));
                 console.log();
             }
-            
+
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                
+
                 printLog('error', `Connection closed - Status: ${statusCode}`);
-                
+
                 if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
                     try {
                         rmSync('./session', { recursive: true, force: true });
@@ -525,7 +530,7 @@ async function startQasimDev() {
                         printLog('error', `Error deleting session: ${error.message}`);
                     }
                 }
-                
+
                 if (shouldReconnect) {
                     printLog('connection', 'Reconnecting in 5 seconds...');
                     await delay(5000);
@@ -553,12 +558,12 @@ async function startQasimDev() {
         return QasimDev;
     } catch (error) {
         printLog('error', `Error in startQasimDev: ${error.message}`);
-        
+
         if (rl && !rl.closed) {
             rl.close();
             rl = null;
         }
-        
+
         await delay(5000);
         startQasimDev();
     }
@@ -567,24 +572,24 @@ async function startQasimDev() {
 
 async function main() {
     printLog('info', 'Starting MEGA MD BOT...');
-    
+
     const sessionReady = await initializeSession();
-    
+
     if (sessionReady) {
         printLog('success', 'Session initialization complete. Starting bot...');
     } else {
         printLog('warning', 'Session initialization incomplete. Will attempt pairing...');
     }
-    
+
     await delay(3000);
-    
+
     startQasimDev().catch(error => {
         printLog('error', `Fatal error: ${error.message}`);
-        
+
         if (rl && !rl.closed) {
             rl.close();
         }
-        
+
         process.exit(1);
     });
 }
@@ -599,23 +604,23 @@ process.env.TEMP = customTemp;
 process.env.TMP = customTemp;
 
 setInterval(() => {
-  fs.readdir(customTemp, (err, files) => {
-    if (err) return;
-    for (const file of files) {
-      const filePath = path.join(customTemp, file);
-      fs.stat(filePath, (err, stats) => {
-        if (!err && Date.now() - stats.mtimeMs > 3 * 60 * 60 * 1000) {
-          fs.unlink(filePath, () => {});
+    fs.readdir(customTemp, (err, files) => {
+        if (err) return;
+        for (const file of files) {
+            const filePath = path.join(customTemp, file);
+            fs.stat(filePath, (err, stats) => {
+                if (!err && Date.now() - stats.mtimeMs > 3 * 60 * 60 * 1000) {
+                    fs.unlink(filePath, () => { });
+                }
+            });
         }
-      });
-    }
-  });
-//  console.log('🧹 Temp folder auto-cleaned');
+    });
+    //  console.log('🧹 Temp folder auto-cleaned');
 }, 1 * 60 * 60 * 1000);
 
 const folders = [
-  path.join(__dirname, './lib'),
-  path.join(__dirname, './plugins')
+    path.join(__dirname, './lib'),
+    path.join(__dirname, './plugins')
 ];
 
 let totalFiles = 0;
@@ -623,32 +628,32 @@ let okFiles = 0;
 let errorFiles = 0;
 
 folders.forEach(folder => {
-  if (!fs.existsSync(folder)) return;
+    if (!fs.existsSync(folder)) return;
 
-  fs.readdirSync(folder)
-    .filter(file => file.endsWith('.js'))
-    .forEach(file => {
-      totalFiles++;
-      const filePath = path.join(folder, file);
+    fs.readdirSync(folder)
+        .filter(file => file.endsWith('.js'))
+        .forEach(file => {
+            totalFiles++;
+            const filePath = path.join(folder, file);
 
-      try {
-        const code = fs.readFileSync(filePath, 'utf-8');
-        const err = syntaxerror(code, file, {
-          sourceType: 'script',
-          allowAwaitOutsideFunction: true
+            try {
+                const code = fs.readFileSync(filePath, 'utf-8');
+                const err = syntaxerror(code, file, {
+                    sourceType: 'script',
+                    allowAwaitOutsideFunction: true
+                });
+
+                if (err) {
+                    console.error(chalk.red(`❌ Syntax error in ${filePath}:\n${err}`));
+                    errorFiles++;
+                } else {
+                    okFiles++;
+                }
+            } catch (e) {
+                console.error(chalk.yellow(`⚠️ Cannot read file ${filePath}:\n${e}`));
+                errorFiles++;
+            }
         });
-
-        if (err) {
-          console.error(chalk.red(`❌ Syntax error in ${filePath}:\n${err}`));
-          errorFiles++;
-        } else {
-          okFiles++;
-        }
-      } catch (e) {
-        console.error(chalk.yellow(`⚠️ Cannot read file ${filePath}:\n${e}`));
-        errorFiles++;
-      }
-    });
 });
 
 /**
