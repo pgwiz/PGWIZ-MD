@@ -413,17 +413,19 @@ async function startQasimDev() {
         const isRegistered = state.creds?.registered === true;
         const hasValidMe = state.creds?.me?.id ? true : false;
 
-        // Only skip pairing if BOTH me.id exists AND registered is true
-        if (hasValidMe && isRegistered) {
-            printLog('info', `Valid registered session: ${state.creds.me.id}`);
+        // If we have me.id (from session service), trust it and attempt connection
+        // No need for manual pairing - Baileys will handle registration during connection
+        if (hasValidMe) {
+            printLog('info', `Session has me.id: ${state.creds.me.id} (registered: ${isRegistered}) - attempting connection...`);
             if (rl && !rl.closed) {
                 rl.close();
                 rl = null;
             }
         } else if (pairingCode) {
+            // Only prompt for pairing if we have NO me.id at all (fresh start)
             if (useMobile) throw new Error('Cannot use pairing code with mobile api');
 
-            printLog('warning', 'Session not registered. Pairing code required');
+            printLog('warning', 'No session found. Pairing code required');
 
             let phoneNumberInput;
             if (!!global.phoneNumber) {
@@ -465,11 +467,6 @@ async function startQasimDev() {
                     printLog('error', `Failed to get pairing code: ${error.message}`);
                 }
             }, 3000);
-        } else if (isRegistered) {
-            if (rl && !rl.closed) {
-                rl.close();
-                rl = null;
-            }
         } else {
             printLog('warning', 'Waiting for connection to establish...');
             if (rl && !rl.closed) {
