@@ -76,7 +76,7 @@ setInterval(() => {
 let phoneNumber = global.PAIRING_NUMBER || process.env.PAIRING_NUMBER || "923051391005";
 let owner = JSON.parse(fs.readFileSync('./data/owner.json'));
 
-global.botname = process.env.BOT_NAME || "MEGA-MD";
+global.botname = process.env.BOT_NAME || "PGWIZ-MD";
 global.themeemoji = "•";
 
 const pairingCode = !!phoneNumber || process.argv.includes("--pairing-code");
@@ -497,10 +497,10 @@ async function startQasimDev() {
                 }
 
                  await delay(1999);
-                console.log(chalk.yellow(`\n\n                  ${chalk.bold.blue(`[ ${global.botname || 'MEGA-MD'} ]`)}\n\n`));
+                console.log(chalk.yellow(`\n\n                  ${chalk.bold.blue(`[ ${global.botname || 'PGWIZ-MD'} ]`)}\n\n`));
                 console.log(chalk.cyan(`< ================================================== >`));
-                console.log(chalk.magenta(`\n${global.themeemoji || '•'} YT CHANNEL: GlobalTechInfo`));
-                console.log(chalk.magenta(`${global.themeemoji || '•'} GITHUB: GlobalTechInfo`));
+                console.log(chalk.magenta(`\n${global.themeemoji || '•'} YT CHANNEL: pgwiz`));
+                console.log(chalk.magenta(`${global.themeemoji || '•'} GITHUB: pgwiz`));
                 console.log(chalk.magenta(`${global.themeemoji || '•'} WA NUMBER: ${owner}`));
                 console.log(chalk.magenta(`${global.themeemoji || '•'} CREDIT: Qasim Ali`));
                 console.log(chalk.green(`${global.themeemoji || '•'} 🤖 Bot Connected Successfully! ✅`));

@@ -1,18 +1,18 @@
 <h1 align="center"> 🤖 MULTI DEVICE WHATSAPP BOT </h1>
 
 <div align="center"> 
-  <a href="https://youtube.com/@GlobalTechInfo"> 
-    <img src="https://github.com/GlobalTechInfo/MEGA-MD/blob/main/assets/bot_image.jpg" alt="MEGA AI" height="300"> 
+  <a href="https://youtube.com/@pgwiz"> 
+    <img src="https://github.com/pgwiz/PGWIZ-MD/blob/main/assets/bot_image.jpg" alt="MEGA AI" height="300"> 
   </a> 
 </div>
 
 <div align="center">
 
-<img src="https://komarev.com/ghpvc/?username=GlobalTechInfo&label=Profile+Views&color=success&style=flat-square" />
-<img src="https://img.shields.io/github/stars/GlobalTechInfo/MEGA-MD?color=blue&style=yellow-square" />
-<img src="https://img.shields.io/github/forks/GlobalTechInfo/MEGA-MD?color=ff00ff&style=flat-square" />
-<img src="https://img.shields.io/github/repo-size/GlobalTechInfo/MEGA-MD?color=success&style=flat-square" />
-<img src="https://img.shields.io/github/last-commit/GlobalTechInfo/MEGA-MD?color=yellow&style=flat-square" />
+<img src="https://komarev.com/ghpvc/?username=pgwiz&label=Profile+Views&color=success&style=flat-square" />
+<img src="https://img.shields.io/github/stars/pgwiz/PGWIZ-MD?color=blue&style=yellow-square" />
+<img src="https://img.shields.io/github/forks/pgwiz/PGWIZ-MD?color=ff00ff&style=flat-square" />
+<img src="https://img.shields.io/github/repo-size/pgwiz/PGWIZ-MD?color=success&style=flat-square" />
+<img src="https://img.shields.io/github/last-commit/pgwiz/PGWIZ-MD?color=yellow&style=flat-square" />
 <a href="https://discord.gg/fZ7MVJM9sq">
   <img title="Join our Discord" src="https://img.shields.io/discord/1391898062494105752?label=Discord&logo=discord&logoColor=white&style=flat-square&color=7289DA" alt="Discord">
 </a>
@@ -32,7 +32,7 @@
 Click the button below to fork the Mega Md repository to your GitHub account:
 
 <div align="center">
-  <a href="https://github.com/GlobalTechInfo/MEGA-MD/fork">
+  <a href="https://github.com/pgwiz/PGWIZ-MD/fork">
     <img src="https://img.shields.io/badge/Fork-Repo-orange?style=for-the-badge" alt="Fork the repository"/>
   </a>
 </div>
@@ -79,7 +79,7 @@ Easily connect to your WhatsApp account by pair code.
 1. [Sign Up on Heroku](https://signup.heroku.com/) if you haven’t already.
 2. Click the button below to deploy directly In Heroku:
    <br>
-   <a href='https://heroku.com/deploy?template=https://github.com/GlobTechInfo/MEGA-MD/Bypass' target="_blank">
+   <a href='https://heroku.com/deploy?template=https://github.com/GlobTechInfo/PGWIZ-MD/Bypass' target="_blank">
       <img alt='Deploy In Heroku' src='https://img.shields.io/badge/-DEPLOY%20NOW-purple?style=for-the-badge&logo=heroku&logoColor=white'/>
    </a>
 
@@ -111,7 +111,7 @@ Easily connect to your WhatsApp account by pair code.
 1. [Sign Up on Replit](https://repl.it) if you haven’t already.
 2. Click the button below to deploy using Replit:
    <br>
-   <a href='https://repl.it/github/GlobalTechInfo/MEGA-MD' target="_blank">
+   <a href='https://repl.it/github/pgwiz/PGWIZ-MD' target="_blank">
       <img alt='Deploy In Replit' src='https://img.shields.io/badge/-DEPLOY-orange?style=for-the-badge&logo=replit&logoColor=white'/>
    </a>
 
@@ -208,8 +208,8 @@ apt -y remove nodejs
 curl -fsSl https://deb.nodesource.com/setup_20.x | bash - && apt -y install nodejs
 ```
 ```
-git clone https://github.com/<your gitHub Username>/MEGA-MD
-cd MEGA-MD
+git clone https://github.com/<your gitHub Username>/PGWIZ-MD
+cd PGWIZ-MD
 ```
 ```
 npm install
@@ -223,26 +223,26 @@ npm start
 
 ## License
 
-This project is licensed under the [MIT License](https://opensource.org/licenses/MIT) - see the [LICENSE](https://github.com/GlobalTechInfo/MEGA-MD/blob/main/LICENSE) file for details.
+This project is licensed under the [MIT License](https://opensource.org/licenses/MIT) - see the [LICENSE](https://github.com/pgwiz/PGWIZ-MD/blob/main/LICENSE) file for details.
 
 ---
 
 ## Contributions
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/GlobalTechInfo/MEGA-MD/issues).
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/pgwiz/PGWIZ-MD/issues).
 
 ---
 
 ## 🌟 Show your support
 
-If you like this project, please give it a [⭐️ star on GitHub](https://github.com/GlobalTechInfo/MEGA-MD)!
+If you like this project, please give it a [⭐️ star on GitHub](https://github.com/pgwiz/PGWIZ-MD)!
 
 
 ## Credits
 
-| [![Qasim Ali](https://github.com/GlobalTechInfo.png?size=100)](https://github.com/GlobalTechInfo) | [![WhiskeySockets](https://github.com/WhiskeySockets.png?size=100)](https://github.com/WhiskeySockets) |
+| [![Qasim Ali](https://github.com/pgwiz.png?size=100)](https://github.com/pgwiz) | [![WhiskeySockets](https://github.com/WhiskeySockets.png?size=100)](https://github.com/WhiskeySockets) |
 | --- | --- 
-| [Qasim Ali](https://github.com/GlobalTechInfo) |[WhiskeySockets](https://github.com/WhiskeySockets) |
+| [Qasim Ali](https://github.com/pgwiz) |[WhiskeySockets](https://github.com/WhiskeySockets) |
 
 ---
 
@@ -260,7 +260,7 @@ If you like this project, please give it a [⭐️ star on GitHub](https://githu
 
 ## Copyright Notice
 
-Copyright (c) 2026 GlobalTechInfo. All rights reserved.
+Copyright (c) 2026 pgwiz. All rights reserved.
 
 This project contains code from various open source projects:
 - Baileys (MIT License)

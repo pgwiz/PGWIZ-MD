@@ -1,10 +1,10 @@
 {
-  "name": "mega-md",
+  "name": "PGWIZ-MD",
   "description": " Whatsapp automation",
   "keywords": [
     "whatsapp Bot"
   ],
-  "repository": "https://github.com/GlobalTechInfo/MEGA-MD",
+  "repository": "https://github.com/pgwiz/PGWIZ-MD",
   "stack": "container",
   "env": {
     "MONGO_URL": {

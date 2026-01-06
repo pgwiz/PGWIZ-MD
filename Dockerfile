@@ -1,9 +1,9 @@
 FROM quay.io/qasimtech/mega-bot:latest
 
-RUN git clone https://github.com/GlobalTechInfo/MEGA-MD /root/mega-md && \
-    rm -rf /root/mega-md/.git
+RUN git clone https://github.com/pgwiz/PGWIZ-MD /root/PGWIZ-MD && \
+    rm -rf /root/PGWIZ-MD/.git
 
-WORKDIR /root/mega-md
+WORKDIR /root/PGWIZ-MD
 
 RUN npm install
 

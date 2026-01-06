@@ -4,7 +4,7 @@ module.exports = {
   command: 'pair',
   aliases: ['paircode', 'session', 'getsession', 'sessionid'],
   category: 'general',
-  description: 'Get session id for MEGA-MD',
+  description: 'Get session id for PGWIZ-MD',
   usage: '.pair 92305395XXXX',
   
   async handler(sock, message, args, context = {}) {
@@ -54,7 +54,7 @@ module.exports = {
           throw new Error("Server is busy");
         }
 
-        const successText = `✅ *MEGA-MD PAIRING CODE*\n\n` +
+        const successText = `✅ *PGWIZ-MD PAIRING CODE*\n\n` +
                             `Code: *${pairingCode}*\n\n` +
                             `*How to use:*\n` +
                             `1. Open WhatsApp Settings\n` +

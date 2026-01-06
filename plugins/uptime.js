@@ -2,13 +2,13 @@
  *                                                                           *
  *                     Developed By Qasim Ali                                *
  *                                                                           *
- *  🌐  GitHub   : https://github.com/GlobalTechInfo                         *
- *  ▶️  YouTube  : https://youtube.com/@GlobalTechInfo                       *
+ *  🌐  GitHub   : https://github.com/pgwiz                         *
+ *  ▶️  YouTube  : https://youtube.com/@pgwiz                       *
  *  💬  WhatsApp : https://whatsapp.com/channel/0029VagJIAr3bbVBCpEkAM07     *
  *                                                                           *
- *    © 2026 GlobalTechInfo. All rights reserved.                            *
+ *    © 2026 pgwiz. All rights reserved.                            *
  *                                                                           *
- *    Description: This file is part of the MEGA-MD Project.                 *
+ *    Description: This file is part of the PGWIZ-MD Project.                 *
  *                 Unauthorized copying or distribution is prohibited.       *
  *                                                                           *
  *****************************************************************************/
@@ -47,7 +47,7 @@ module.exports = {
     const commandCount = commandHandler.commands.size;
 
     const text =
-      `🤖 *MEGA-MD STATUS*\n\n` +
+      `🤖 *PGWIZ-MD STATUS*\n\n` +
       `⏱ Uptime: ${formatUptime(uptimeMs)}\n` +
       `🚀 Started: ${startedAt}\n` +
       `📦 Plugins: ${commandCount}\n` +
@@ -61,13 +61,13 @@ module.exports = {
  *                                                                           *
  *                     Developed By Qasim Ali                                *
  *                                                                           *
- *  🌐  GitHub   : https://github.com/GlobalTechInfo                         *
- *  ▶️  YouTube  : https://youtube.com/@GlobalTechInfo                       *
+ *  🌐  GitHub   : https://github.com/pgwiz                         *
+ *  ▶️  YouTube  : https://youtube.com/@pgwiz                       *
  *  💬  WhatsApp : https://whatsapp.com/channel/0029VagJIAr3bbVBCpEkAM07     *
  *                                                                           *
- *    © 2026 GlobalTechInfo. All rights reserved.                            *
+ *    © 2026 pgwiz. All rights reserved.                            *
  *                                                                           *
- *    Description: This file is part of the MEGA-MD Project.                 *
+ *    Description: This file is part of the PGWIZ-MD Project.                 *
  *                 Unauthorized copying or distribution is prohibited.       *
  *                                                                           *
  *****************************************************************************/

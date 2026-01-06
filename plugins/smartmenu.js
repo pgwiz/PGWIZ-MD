@@ -75,9 +75,9 @@ module.exports = {
       const fastEmoji = getRandomEmoji(fastEmojis);
       const slowEmoji = getRandomEmoji(slowEmojis);
 
-      let menuText = `${menuEmoji} *${settings.botName || 'MEGA-MD'}* ${menuEmoji}\n\n`;
+      let menuText = `${menuEmoji} *${settings.botName || 'PGWIZ-MD'}* ${menuEmoji}\n\n`;
       menuText += `┏━━━━━━━━━━━━━━━━┓\n`;
-      menuText += `┃ 📱 *Bot:* ${settings.botName || 'MEGA-MD'}\n`;
+      menuText += `┃ 📱 *Bot:* ${settings.botName || 'PGWIZ-MD'}\n`;
       menuText += `┃ 🔖 *Version:* ${settings.version || '1.0.0'}\n`;
       menuText += `┃ 👤 *Owner:* ${settings.botOwner || 'Unknown'}\n`;
       menuText += `┃ ⏰ *Time:* ${formatTime()}\n`;

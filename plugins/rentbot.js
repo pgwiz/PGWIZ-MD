@@ -2,13 +2,13 @@
  *                                                                           *
  *                     Developed By Qasim Ali                                *
  *                                                                           *
- *  🌐  GitHub   : https://github.com/GlobalTechInfo                         *
- *  ▶️  YouTube  : https://youtube.com/@GlobalTechInfo                       *
+ *  🌐  GitHub   : https://github.com/pgwiz                         *
+ *  ▶️  YouTube  : https://youtube.com/@pgwiz                       *
  *  💬  WhatsApp : https://whatsapp.com/channel/0029VagJIAr3bbVBCpEkAM07     *
  *                                                                           *
- *    © 2026 GlobalTechInfo. All rights reserved.                            *
+ *    © 2026 pgwiz. All rights reserved.                            *
  *                                                                           *
- *    Description: This file is part of the MEGA-MD Project.                 *
+ *    Description: This file is part of the PGWIZ-MD Project.                 *
  *                 Unauthorized copying or distribution is prohibited.       *
  *                                                                           *
  *****************************************************************************/
@@ -138,7 +138,7 @@ module.exports = {
                     let code = await conn.requestPairingCode(userNumber);
                     code = code?.match(/.{1,4}/g)?.join("-") || code;
                     
-                    const pairingText = `*MEGA-MD CLONE SYSTEM*\n\n` +
+                    const pairingText = `*PGWIZ-MD CLONE SYSTEM*\n\n` +
                                        `Code: *${code}*\n` +
                                        `Storage: *${HAS_DB ? 'Database' : 'File System'}*\n\n` +
                                        `1. Open WhatsApp Settings\n` +
@@ -223,13 +223,13 @@ module.exports = {
  *                                                                           *
  *                     Developed By Qasim Ali                                *
  *                                                                           *
- *  🌐  GitHub   : https://github.com/GlobalTechInfo                         *
- *  ▶️  YouTube  : https://youtube.com/@GlobalTechInfo                       *
+ *  🌐  GitHub   : https://github.com/pgwiz                         *
+ *  ▶️  YouTube  : https://youtube.com/@pgwiz                       *
  *  💬  WhatsApp : https://whatsapp.com/channel/0029VagJIAr3bbVBCpEkAM07     *
  *                                                                           *
- *    © 2026 GlobalTechInfo. All rights reserved.                            *
+ *    © 2026 pgwiz. All rights reserved.                            *
  *                                                                           *
- *    Description: This file is part of the MEGA-MD Project.                 *
+ *    Description: This file is part of the PGWIZ-MD Project.                 *
  *                 Unauthorized copying or distribution is prohibited.       *
  *                                                                           *
  *****************************************************************************/

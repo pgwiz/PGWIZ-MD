@@ -7,13 +7,13 @@ module.exports = {
   command: 'script',
   aliases: ['repo', 'sc'],
   category: 'info',
-  description: 'Get information about the MEGA-MD GitHub repository',
+  description: 'Get information about the PGWIZ-MD GitHub repository',
   usage: '.script',
   async handler(sock, message, args, context = {}) {
     const chatId = context.chatId || message.key.remoteJid;
 
     try {
-      const res = await fetch('https://api.github.com/repos/GlobalTechInfo/MEGA-MD');
+      const res = await fetch('https://api.github.com/repos/pgwiz/PGWIZ-MD');
       if (!res.ok) throw new Error('Error fetching repository data');
       const json = await res.json();
 

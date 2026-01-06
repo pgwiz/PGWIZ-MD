@@ -18,12 +18,12 @@
   "install:force": "npm install --force",
   "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["termux-whatsapp-bot","whatsapp-bot","whatsapp-api","baileys-bot","whatsApp","mega-bot","mega-md","multi-device","mega-ai"],
-  "homepage": "https://github.com/GlobalTechInfo/MEGA-MD",
-  "repository": {"type": "git","url": "git+https://github.com/GlobalTechInfo/MEGA-MD.git"},
-  "bugs": {"url": "https://github.com/GlobalTechInfo/MEGA-MD/issues"},
+  "keywords": ["termux-whatsapp-bot","whatsapp-bot","whatsapp-api","baileys-bot","whatsApp","mega-bot","PGWIZ-MD","multi-device","mega-ai"],
+  "homepage": "https://github.com/pgwiz/PGWIZ-MD",
+  "repository": {"type": "git","url": "git+https://github.com/pgwiz/PGWIZ-MD.git"},
+  "bugs": {"url": "https://github.com/pgwiz/PGWIZ-MD/issues"},
   "license": "MIT",
-  "author": "GlobalTechInfo",
+  "author": "pgwiz",
   "dependencies": {
   "@adiwajshing/keyed-db": "^0.2.4",
   "@whiskeysockets/baileys": "^7.0.0-rc.9",
@@ -72,6 +72,6 @@
   "engines": {"node": ">=20.0.0"},
   "contributors": [
   {"name": "Qasim Ali","role": "Lead Developer"},
-  {"name": "GlobalTechInfo","role": "Maintainer"}
+  {"name": "pgwiz","role": "Maintainer"}
   ]
 }
