@@ -398,8 +398,16 @@ async function startQasimDev() {
         QasimDev.serializeM = (m) => smsg(QasimDev, m, store);
 
         const isRegistered = state.creds?.registered === true;
+        const hasValidMe = state.creds?.me?.id ? true : false;
 
-        if (pairingCode && !isRegistered) {
+        // If we have a valid me.id, skip pairing and attempt connection
+        if (hasValidMe) {
+            printLog('info', `Session has me.id: ${state.creds.me.id} - attempting connection...`);
+            if (rl && !rl.closed) {
+                rl.close();
+                rl = null;
+            }
+        } else if (pairingCode && !isRegistered) {
             if (useMobile) throw new Error('Cannot use pairing code with mobile api');
 
             printLog('warning', 'Session not registered. Pairing code required');
