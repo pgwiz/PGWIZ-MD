@@ -133,6 +133,15 @@ async function handleStatusUpdate(sock, status) {
         if (status.messages && status.messages.length > 0) {
             const msg = status.messages[0];
             console.log('[AUTOSTATUS DEBUG] Found message, remoteJid:', msg.key?.remoteJid);
+
+            // ID debug
+            if (msg.messageTimestamp) {
+                const ts = (msg.messageTimestamp.low || msg.messageTimestamp);
+                const now = Math.floor(Date.now() / 1000);
+                const diff = now - ts;
+                console.log(`[AUTOSTATUS DEBUG] Msg Time: ${ts}, Now: ${now}, Delay: ${diff}s`);
+            }
+
             if (msg.key && msg.key.remoteJid === 'status@broadcast') {
                 try {
                     console.log('[AUTOSTATUS DEBUG] Attempting to read status message');
