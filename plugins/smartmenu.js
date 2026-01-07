@@ -9,45 +9,45 @@ const disabledEmojis = ['❌', '🔴', '⛔', '🚫', '❎'];
 const fastEmojis = ['⚡', '🚀', '💨', '⏱️', '🔥'];
 const slowEmojis = ['🐢', '🐌', '⏳', '⌛', '🕐'];
 const categoryEmojis = {
-    general: ['📱', '🔧', '⚙️', '🛠️'],
-    owner: ['👑', '🔱', '💎', '🎖️'],
-    admin: ['🛡️', '⚔️', '🔐', '👮'],
-    group: ['👥', '👫', '🧑‍🤝‍🧑', '👨‍👩‍👧‍👦'],
-    download: ['📥', '⬇️', '💾', '📦'],
-    ai: ['🤖', '🧠', '💭', '🎯'],
-    search: ['🔍', '🔎', '🕵️', '📡'],
-    apks: ['📲', '📦', '💿', '🗂️'],
-    info: ['ℹ️', '📋', '📊', '📄'],
-    fun: ['🎮', '🎲', '🎰', '🎪'],
-    stalk: ['👀', '🔭', '🕵️', '🎯'],
-    games: ['🎮', '🕹️', '🎯', '🏆'],
-    images: ['🖼️', '📸', '🎨', '🌄'],
-    menu: ['📜', '📋', '📑', '📚'],
-    tools: ['🔨', '🔧', '⚡', '🛠️'],
-    stickers: ['🎭', '😀', '🎨', '🖼️'],
-    quotes: ['💬', '📖', '✍️', '💭'],
-    music: ['🎵', '🎶', '🎧', '🎤'],
-    utility: ['📂', '🔧', '⚙️', '🛠️']
+  general: ['📱', '🔧', '⚙️', '🛠️'],
+  owner: ['👑', '🔱', '💎', '🎖️'],
+  admin: ['🛡️', '⚔️', '🔐', '👮'],
+  group: ['👥', '👫', '🧑‍🤝‍🧑', '👨‍👩‍👧‍👦'],
+  download: ['📥', '⬇️', '💾', '📦'],
+  ai: ['🤖', '🧠', '💭', '🎯'],
+  search: ['🔍', '🔎', '🕵️', '📡'],
+  apks: ['📲', '📦', '💿', '🗂️'],
+  info: ['ℹ️', '📋', '📊', '📄'],
+  fun: ['🎮', '🎲', '🎰', '🎪'],
+  stalk: ['👀', '🔭', '🕵️', '🎯'],
+  games: ['🎮', '🕹️', '🎯', '🏆'],
+  images: ['🖼️', '📸', '🎨', '🌄'],
+  menu: ['📜', '📋', '📑', '📚'],
+  tools: ['🔨', '🔧', '⚡', '🛠️'],
+  stickers: ['🎭', '😀', '🎨', '🖼️'],
+  quotes: ['💬', '📖', '✍️', '💭'],
+  music: ['🎵', '🎶', '🎧', '🎤'],
+  utility: ['📂', '🔧', '⚙️', '🛠️']
 };
 
 function getRandomEmoji(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 function getCategoryEmoji(category) {
-    const emojis = categoryEmojis[category.toLowerCase()] || ['📂', '📁', '🗂️', '📋'];
-    return getRandomEmoji(emojis);
+  const emojis = categoryEmojis[category.toLowerCase()] || ['📂', '📁', '🗂️', '📋'];
+  return getRandomEmoji(emojis);
 }
 
 function formatTime() {
-    const now = new Date();
-    const options = { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false,
-        timeZone: settings.timeZone || 'UTC'
-    };
-    return now.toLocaleTimeString('en-US', options);
+  const now = new Date();
+  const options = {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: settings.timeZone || 'UTC'
+  };
+  return now.toLocaleTimeString('en-US', options);
 }
 
 module.exports = {
@@ -67,9 +67,9 @@ module.exports = {
 
       const categories = Array.from(CommandHandler.categories.keys());
       const stats = CommandHandler.getDiagnostics();
-      
+
       const menuEmoji = getRandomEmoji(menuEmojis);
-      
+
       const activeEmoji = getRandomEmoji(activeEmojis);
       const disabledEmoji = getRandomEmoji(disabledEmojis);
       const fastEmoji = getRandomEmoji(fastEmojis);
@@ -99,25 +99,25 @@ module.exports = {
         const catEmoji = getCategoryEmoji(cat);
         menuText += `${catEmoji} *${cat.toUpperCase()}*\n`;
         menuText += `┌─────────────────\n`;
-        
+
         const catCmds = CommandHandler.getCommandsByCategory(cat);
-        
+
         catCmds.forEach((cmdName, index) => {
           const isLast = index === catCmds.length - 1;
           const prefix = isLast ? '└' : '├';
-          
+
           const isOff = CommandHandler.disabledCommands.has(cmdName.toLowerCase());
           const cmdStats = stats.find(s => s.command === cmdName.toLowerCase());
-          
+
           const statusIcon = isOff ? disabledEmoji : activeEmoji;
-          
+
           let speedTag = '';
           if (cmdStats && !isOff) {
             const ms = parseFloat(cmdStats.average_speed);
             if (ms > 0 && ms < 100) speedTag = ` ${fastEmoji}`;
             else if (ms > 1000) speedTag = ` ${slowEmoji}`;
           }
-          
+
           menuText += `${prefix}─ ${statusIcon} .${cmdName}${speedTag}\n`;
         });
         menuText += `\n`;
@@ -138,8 +138,8 @@ module.exports = {
           forwardingScore: 1,
           isForwarded: true,
           forwardedNewsletterMessageInfo: {
-            newsletterJid: '120363319098372999@newsletter',
-            newsletterName: settings.botName || 'PGWIZ-MD',
+            newsletterJid: settings.newsletterJid || '120363319098372999@newsletter',
+            newsletterName: settings.newsletterName || 'PGWIZ-MD',
             serverMessageId: -1
           }
         }
@@ -149,7 +149,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Menu Error:', error);
-      await sock.sendMessage(chatId, { 
+      await sock.sendMessage(chatId, {
         text: `❌ *Menu Error*\n\n${error.message}`
       }, { quoted: message });
     }

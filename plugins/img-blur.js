@@ -18,8 +18,8 @@ module.exports = {
       } else if (message.message?.imageMessage) {
         imageBuffer = await downloadMediaMessage(message, 'buffer', {}, {});
       } else {
-        await sock.sendMessage(chatId, { 
-          text: 'Please reply to an image or send an image with caption `.blur`' 
+        await sock.sendMessage(chatId, {
+          text: 'Please reply to an image or send an image with caption `.blur`'
         }, { quoted: message });
         return;
       }
@@ -41,8 +41,8 @@ module.exports = {
           forwardingScore: 1,
           isForwarded: true,
           forwardedNewsletterMessageInfo: {
-            newsletterJid: '120363319098372999@newsletter',
-            newsletterName: 'PGWIZ-MD',
+            newsletterJid: settings.newsletterJid || '120363319098372999@newsletter',
+            newsletterName: settings.newsletterName || 'PGWIZ-MD',
             serverMessageId: -1
           }
         }
@@ -50,8 +50,8 @@ module.exports = {
 
     } catch (error) {
       console.error('Error in blur command:', error);
-      await sock.sendMessage(chatId, { 
-        text: '❌ Failed to blur image. Please try again later.' 
+      await sock.sendMessage(chatId, {
+        text: '❌ Failed to blur image. Please try again later.'
       }, { quoted: message });
     }
   }

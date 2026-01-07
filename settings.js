@@ -15,7 +15,9 @@ const settings = {
   version: "5.1.0",
   updateZipUrl: "https://github.com/WiPTechGx/MEGA-MD/archive/refs/heads/main.zip",
   channelLink: "https://whatsapp.com/channel/0029Va8cpObHwXbDoZE9VY3K",
-  ytch: "pgwiz"
+  ytch: "pgwiz",
+  newsletterJid: '120363179639202475@newsletter', // Replace with your newsletter JID (use .channelid command to find it)
+  newsletterName: "PGWIZ-MD"
 };
 
 module.exports = settings;
