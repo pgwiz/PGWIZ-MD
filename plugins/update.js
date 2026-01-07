@@ -25,6 +25,8 @@ async function hasGitRepo() {
 }
 
 async function updateViaGit() {
+  // Fix remote if needed:
+  await run('git remote set-url origin https://github.com/WiPTechGx/MEGA-MD.git').catch(() => { });
   const oldRev = (await run('git rev-parse HEAD').catch(() => 'unknown')).trim();
   await run('git fetch --all --prune');
   const newRev = (await run('git rev-parse origin/main')).trim();
@@ -68,7 +70,7 @@ function downloadFile(url, dest, visited = new Set()) {
         res.pipe(file);
         file.on('finish', () => file.close(resolve));
         file.on('error', err => {
-          try { file.close(() => {}); } catch {}
+          try { file.close(() => { }); } catch { }
           fs.unlink(dest, () => reject(err));
         });
       });
@@ -91,17 +93,17 @@ async function extractZip(zipPath, outDir) {
     await run('command -v unzip');
     await run(`unzip -o '${zipPath}' -d '${outDir}'`);
     return;
-  } catch {}
+  } catch { }
   try {
     await run('command -v 7z');
     await run(`7z x -y '${zipPath}' -o'${outDir}'`);
     return;
-  } catch {}
+  } catch { }
   try {
     await run('busybox unzip -h');
     await run(`busybox unzip -o '${zipPath}' -d '${outDir}'`);
     return;
-  } catch {}
+  } catch { }
   throw new Error("No system unzip tool found (unzip/7z/busybox). Git mode is recommended on this panel.");
 }
 
@@ -144,7 +146,7 @@ async function updateViaZip(sock, chatId, message, zipOverride) {
     const currentSettings = require('../settings');
     preservedOwner = currentSettings && currentSettings.ownerNumber ? String(currentSettings.ownerNumber) : null;
     preservedBotOwner = currentSettings && currentSettings.botOwner ? String(currentSettings.botOwner) : null;
-  } catch {}
+  } catch { }
   copyRecursive(srcRoot, process.cwd(), ignore, '', copied);
   if (preservedOwner) {
     try {
@@ -157,10 +159,10 @@ async function updateViaZip(sock, chatId, message, zipOverride) {
         }
         fs.writeFileSync(settingsPath, text);
       }
-    } catch {}
+    } catch { }
   }
-  try { fs.rmSync(extractTo, { recursive: true, force: true }); } catch {}
-  try { fs.rmSync(zipPath, { force: true }); } catch {}
+  try { fs.rmSync(extractTo, { recursive: true, force: true }); } catch { }
+  try { fs.rmSync(zipPath, { force: true }); } catch { }
   return { copiedFiles: copied };
 }
 
@@ -168,7 +170,7 @@ async function restartProcess() {
   try {
     await run('pm2 restart all');
     return;
-  } catch {}
+  } catch { }
   setTimeout(() => {
     process.exit(0);
   }, 500);
@@ -181,33 +183,33 @@ module.exports = {
   description: 'Update bot from git or zip without stopping',
   usage: '.update [zip_url]',
   ownerOnly: true,
-  
+
   async handler(sock, message, args, context) {
     const { chatId, channelInfo } = context;
-    
+
     try {
-      await sock.sendMessage(chatId, { 
+      await sock.sendMessage(chatId, {
         text: '🔄 Updating the bot, please wait…',
         ...channelInfo
       }, { quoted: message });
-      
+
       let changesSummary = '';
-      
+
       if (await hasGitRepo()) {
         const { oldRev, newRev, alreadyUpToDate, commits, files } = await updateViaGit();
-        
+
         if (alreadyUpToDate) {
           changesSummary = `✅ Already up to date\nCurrent: ${newRev.substring(0, 7)}`;
         } else {
           changesSummary = `✅ Updated successfully!\n\n`;
           changesSummary += `📌 Old: ${oldRev.substring(0, 7)}\n`;
           changesSummary += `📌 New: ${newRev.substring(0, 7)}\n\n`;
-          
+
           if (commits) {
             const commitLines = commits.split('\n').slice(0, 5);
             changesSummary += `📝 Recent commits:\n${commitLines.map(c => `• ${c}`).join('\n')}\n\n`;
           }
-          
+
           if (files) {
             const fileLines = files.split('\n').slice(0, 10);
             changesSummary += `📁 Changed files:\n${fileLines.map(f => `• ${f}`).join('\n')}`;
@@ -216,15 +218,15 @@ module.exports = {
             }
           }
         }
-        
+
         await run('npm install --no-audit --no-fund');
       } else {
         const zipOverride = args[0] || null;
         const { copiedFiles } = await updateViaZip(sock, chatId, message, zipOverride);
-        
+
         changesSummary = `✅ Updated from ZIP!\n\n`;
         changesSummary += `📁 Files updated: ${copiedFiles.length}\n\n`;
-        
+
         if (copiedFiles.length > 0) {
           const shown = copiedFiles.slice(0, 10);
           changesSummary += `Recent changes:\n${shown.map(f => `• ${f}`).join('\n')}`;
@@ -233,25 +235,25 @@ module.exports = {
           }
         }
       }
-      
+
       try {
         delete require.cache[require.resolve('../settings')];
         const newSettings = require('../settings');
         const v = newSettings.version || 'unknown';
         changesSummary += `\n\n🔖 Version: ${v}`;
-      } catch {}
-      
-      await sock.sendMessage(chatId, { 
+      } catch { }
+
+      await sock.sendMessage(chatId, {
         text: changesSummary + '\n\n♻️ Restarting bot...',
         ...channelInfo
       }, { quoted: message });
-      
+
       await new Promise(resolve => setTimeout(resolve, 1000));
       await restartProcess();
-      
+
     } catch (err) {
       console.error('Update failed:', err);
-      await sock.sendMessage(chatId, { 
+      await sock.sendMessage(chatId, {
         text: `❌ Update failed:\n${String(err.message || err)}`,
         ...channelInfo
       }, { quoted: message });

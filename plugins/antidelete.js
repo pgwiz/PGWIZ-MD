@@ -39,8 +39,13 @@ const getFolderSizeInMB = (folderPath) => {
 
 const cleanTempFolderIfLarge = () => {
     try {
+        if (!fs.existsSync(TEMP_MEDIA_DIR)) {
+            fs.mkdirSync(TEMP_MEDIA_DIR, { recursive: true });
+            return; // Empty folder needs no cleanup
+        }
+
         const sizeMB = getFolderSizeInMB(TEMP_MEDIA_DIR);
-        
+
         if (sizeMB > 200) {
             const files = fs.readdirSync(TEMP_MEDIA_DIR);
             for (const file of files) {
@@ -189,8 +194,8 @@ async function storeMessage(sock, message) {
                 } else if (mediaType === 'video') {
                     await sock.sendMessage(ownerNumber, { video: { url: mediaPath }, ...mediaOptions });
                 }
-                try { fs.unlinkSync(mediaPath); } catch {}
-            } catch (e) {}
+                try { fs.unlinkSync(mediaPath); } catch { }
+            } catch (e) { }
         }
 
     } catch (err) {
@@ -310,16 +315,16 @@ module.exports = {
         if (!action) {
             await sock.sendMessage(chatId, {
                 text: `*🔰 ANTIDELETE SETUP 🔰*\n\n` +
-                      `*Current Status:* ${config.enabled ? '✅ Enabled' : '❌ Disabled'}\n` +
-                      `*Storage:* ${HAS_DB ? 'Database' : 'File System'}\n\n` +
-                      `*Commands:*\n` +
-                      `• \`.antidelete on\` - Enable\n` +
-                      `• \`.antidelete off\` - Disable\n\n` +
-                      `*Features:*\n` +
-                      `• Track deleted messages\n` +
-                      `• Save deleted media\n` +
-                      `• Auto-save ViewOnce media\n` +
-                      `• Send reports to owner`
+                    `*Current Status:* ${config.enabled ? '✅ Enabled' : '❌ Disabled'}\n` +
+                    `*Storage:* ${HAS_DB ? 'Database' : 'File System'}\n\n` +
+                    `*Commands:*\n` +
+                    `• \`.antidelete on\` - Enable\n` +
+                    `• \`.antidelete off\` - Disable\n\n` +
+                    `*Features:*\n` +
+                    `• Track deleted messages\n` +
+                    `• Save deleted media\n` +
+                    `• Auto-save ViewOnce media\n` +
+                    `• Send reports to owner`
             }, { quoted: message });
             return;
         }
@@ -329,19 +334,19 @@ module.exports = {
             await saveAntideleteConfig(config);
             await sock.sendMessage(chatId, {
                 text: `✅ *Antidelete enabled!*\n\n` +
-                      `Storage: ${HAS_DB ? 'Database' : 'File System'}\n\n` +
-                      `The bot will now:\n` +
-                      `• Track all messages\n` +
-                      `• Monitor deleted messages\n` +
-                      `• Save ViewOnce media\n` +
-                      `• Send deletion reports to owner`
+                    `Storage: ${HAS_DB ? 'Database' : 'File System'}\n\n` +
+                    `The bot will now:\n` +
+                    `• Track all messages\n` +
+                    `• Monitor deleted messages\n` +
+                    `• Save ViewOnce media\n` +
+                    `• Send deletion reports to owner`
             }, { quoted: message });
         } else if (action === 'off') {
             config.enabled = false;
             await saveAntideleteConfig(config);
             await sock.sendMessage(chatId, {
                 text: `❌ *Antidelete disabled!*\n\n` +
-                      `The bot will no longer track deleted messages.`
+                    `The bot will no longer track deleted messages.`
             }, { quoted: message });
         } else {
             await sock.sendMessage(chatId, {
