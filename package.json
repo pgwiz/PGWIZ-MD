@@ -9,10 +9,10 @@
     "plugins": "plugins"
   },
   "scripts": {
-    "start": "pm2 start index.js --name PGWIZ-MD --update-env --time",
-    "stop": "pm2 stop PGWIZ-MD",
-    "restart": "pm2 restart PGWIZ-MD",
-    "logs": "pm2 logs PGWIZ-MD",
+    "start": "pm2 start . --name $(basename $PWD) --update-env --attach --time",
+    "stop": "pm2 stop $(basename $PWD)",
+    "restart": "pm2 restart $(basename $PWD)",
+    "logs": "pm2 logs $(basename $PWD)",
     "dev": "nodemon index.js",
     "check": "node -e \"require('syntax-error'); console.log('Syntax checker ready')\"",
     "lint": "node test.js",
