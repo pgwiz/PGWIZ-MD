@@ -250,6 +250,7 @@ async function startQasimDev() {
             markOnlineOnConnect: !isGhostActive,
             generateHighQualityLinkPreview: true,
             syncFullHistory: false,
+            shouldSyncHistoryMessage: () => false, // Disable history sync for real-time only
             retryRequestDelayMs: 5000, // Wait 5s before retrying failed requests
             fireInitQueries: true, // Ensure we fire init queries on connect
             getMessage: async (key) => {
