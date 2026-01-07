@@ -342,7 +342,7 @@ async function startQasimDev() {
                     : mek.message;
 
                 if (mek.key && mek.key.remoteJid === 'status@broadcast') {
-                    await handleStatus(QasimDev, chatUpdate);
+                    handleStatus(QasimDev, chatUpdate).catch(err => printLog('error', `AutoStatus Error: ${err.message}`));
                     return;
                 }
 

@@ -130,7 +130,8 @@ async function handleStatusUpdate(sock, status) {
             console.log('[AUTOSTATUS DEBUG] AutoStatus is disabled, skipping');
             return;
         }
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Removed artificial delay for speed
+        // await new Promise(resolve => setTimeout(resolve, 1000));
 
         if (status.messages && status.messages.length > 0) {
             const msg = status.messages[0];
