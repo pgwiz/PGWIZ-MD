@@ -6,7 +6,7 @@ module.exports = {
   category: 'general',
   description: 'Get session id for PGWIZ-MD',
   usage: '.pair 92305395XXXX',
-  
+
   async handler(sock, message, args, context = {}) {
     const { chatId } = context;
 
@@ -14,8 +14,8 @@ module.exports = {
       forwardingScore: 1,
       isForwarded: true,
       forwardedNewsletterMessageInfo: {
-        newsletterJid: '120363319098372999@newsletter',
-        newsletterName: 'PGWIZ-MD',
+        newsletterJid: settings.newsletterJid || '120363319098372999@newsletter',
+        newsletterName: settings.newsletterName || 'PGWIZ-MD',
         serverMessageId: -1
       }
     };
@@ -55,13 +55,13 @@ module.exports = {
         }
 
         const successText = `✅ *PGWIZ-MD PAIRING CODE*\n\n` +
-                            `Code: *${pairingCode}*\n\n` +
-                            `*How to use:*\n` +
-                            `1. Open WhatsApp Settings\n` +
-                            `2. Tap 'Linked Devices'\n` +
-                            `3. Tap 'Link a Device'\n` +
-                            `4. Select 'Link with phone number instead'\n` +
-                            `5. Enter the code above.`;
+          `Code: *${pairingCode}*\n\n` +
+          `*How to use:*\n` +
+          `1. Open WhatsApp Settings\n` +
+          `2. Tap 'Linked Devices'\n` +
+          `3. Tap 'Link a Device'\n` +
+          `4. Select 'Link with phone number instead'\n` +
+          `5. Enter the code above.`;
 
         await sock.sendMessage(chatId, {
           text: successText,
@@ -74,7 +74,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Pairing Plugin Error:', error.message);
-      
+
       let errorMsg = "❌ *Pairing Failed*\nReason: ";
       if (error.code === 'ECONNABORTED') {
         errorMsg += "Server timeout. Please try again in 1 minute.";

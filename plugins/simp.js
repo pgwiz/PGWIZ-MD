@@ -12,10 +12,10 @@ module.exports = {
 
         const quotedMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
         const mentionedJid = message.message?.extendedTextMessage?.contextInfo?.mentionedJid;
-        let who = quotedMsg 
-            ? quotedMsg.sender 
-            : mentionedJid && mentionedJid[0] 
-                ? mentionedJid[0] 
+        let who = quotedMsg
+            ? quotedMsg.sender
+            : mentionedJid && mentionedJid[0]
+                ? mentionedJid[0]
                 : sender;
 
         try {
@@ -43,8 +43,8 @@ module.exports = {
                     forwardingScore: 1,
                     isForwarded: true,
                     forwardedNewsletterMessageInfo: {
-                        newsletterJid: '120363319098372999@newsletter',
-                        newsletterName: 'PGWIZ-MD',
+                        newsletterJid: settings.newsletterJid || '120363319098372999@newsletter',
+                        newsletterName: settings.newsletterName || 'PGWIZ-MD',
                         serverMessageId: -1
                     }
                 }
@@ -52,14 +52,14 @@ module.exports = {
 
         } catch (error) {
             console.error('Simp Command Error:', error);
-            await sock.sendMessage(chatId, { 
+            await sock.sendMessage(chatId, {
                 text: '❌ Sorry, I couldn\'t generate the simp card. Please try again later!',
                 contextInfo: {
                     forwardingScore: 1,
                     isForwarded: true,
                     forwardedNewsletterMessageInfo: {
-                        newsletterJid: '120363319098372999@newsletter',
-                        newsletterName: 'PGWIZ-MD',
+                        newsletterJid: settings.newsletterJid || '120363319098372999@newsletter',
+                        newsletterName: settings.newsletterName || 'PGWIZ-MD',
                         serverMessageId: -1
                     }
                 }

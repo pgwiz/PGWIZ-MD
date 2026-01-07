@@ -7,8 +7,8 @@ const channelInfo = {
     forwardingScore: 999,
     isForwarded: true,
     forwardedNewsletterMessageInfo: {
-      newsletterJid: '120363319098372999@newsletter',
-      newsletterName: 'PGWIZ-MD',
+      newsletterJid: settings.newsletterJid || '120363319098372999@newsletter',
+      newsletterName: settings.newsletterName || 'PGWIZ-MD',
       serverMessageId: -1
     }
   }
@@ -63,11 +63,11 @@ module.exports = {
       }
 
       const msgText = `✅ Session files cleared successfully!\n\n` +
-                      `📊 Statistics:\n` +
-                      `• Total files cleared: ${filesCleared}\n` +
-                      `• App state sync files: ${appStateSyncCount}\n` +
-                      `• Pre-key files: ${preKeyCount}\n` +
-                      (errors > 0 ? `\n⚠️ Errors encountered: ${errors}\n${errorDetails.join('\n')}` : '');
+        `📊 Statistics:\n` +
+        `• Total files cleared: ${filesCleared}\n` +
+        `• App state sync files: ${appStateSyncCount}\n` +
+        `• Pre-key files: ${preKeyCount}\n` +
+        (errors > 0 ? `\n⚠️ Errors encountered: ${errors}\n${errorDetails.join('\n')}` : '');
 
       await sock.sendMessage(chatId, { text: msgText, ...channelInfo });
 

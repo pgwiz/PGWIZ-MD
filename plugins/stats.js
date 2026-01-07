@@ -30,13 +30,13 @@ module.exports = {
 
     try {
       const report = CommandHandler.getDiagnostics();
-      
+
       if (!report || report.length === 0) {
         return await sock.sendMessage(chatId, { text: '_No performance data collected yet._' }, { quoted: message });
       }
 
       let text = `📊 *PLUGINS PERFORMANCE*\n\n`;
-      
+
       report.forEach((cmd, index) => {
         const errorText = cmd.errors > 0 ? `❗ Errors: ${cmd.errors}` : `✅ Smooth`;
         text += `${index + 1}. *${cmd.command.toUpperCase()}*\n`;
@@ -51,8 +51,8 @@ module.exports = {
           forwardingScore: 999,
           isForwarded: true,
           forwardedNewsletterMessageInfo: {
-            newsletterJid: '120363319098372999@newsletter',
-            newsletterName: 'PGWIZ-MD PERFORMANCE',
+            newsletterJid: settings.newsletterJid || '120363319098372999@newsletter',
+            newsletterName: settings.newsletterName || 'PGWIZ-MD PERFORMANCE',
             serverMessageId: -1
           }
         }
@@ -79,4 +79,4 @@ module.exports = {
  *                 Unauthorized copying or distribution is prohibited.       *
  *                                                                           *
  *****************************************************************************/
-    
+
