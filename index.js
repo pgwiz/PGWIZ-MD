@@ -1,7 +1,38 @@
 /* process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; */
 
-// Suppress Baileys internal session/prekey debug logs
+const fs = require('fs');
+const path = require('path');
+
+// Auto-clear session files on Bad MAC (keeps creds.json)
+let lastSessionClear = 0;
+function autoSessionClear() {
+    const now = Date.now();
+    if (now - lastSessionClear < 60000) return; // Rate limit: once per minute
+    lastSessionClear = now;
+
+    const sessionDir = path.join(__dirname, 'session');
+    if (!fs.existsSync(sessionDir)) return;
+
+    try {
+        const files = fs.readdirSync(sessionDir);
+        let cleared = 0;
+        for (const file of files) {
+            if (file === 'creds.json') continue; // Keep main credentials
+            try {
+                fs.unlinkSync(path.join(sessionDir, file));
+                cleared++;
+            } catch { }
+        }
+        if (cleared > 0) {
+            console.log(`[AUTO-REPAIR] Cleared ${cleared} corrupted session files`);
+        }
+    } catch { }
+}
+
+// Suppress Baileys internal session/prekey/BadMAC logs
 const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+
 console.log = (...args) => {
     const msg = args[0];
 
@@ -10,7 +41,10 @@ console.log = (...args) => {
         msg.includes('Closing session') ||
         msg.includes('SessionEntry') ||
         msg.includes('_chains') ||
-        msg.includes('registrationId')
+        msg.includes('registrationId') ||
+        msg.includes('pendingPreKey') ||
+        msg.includes('currentRatchet') ||
+        msg.includes('indexInfo')
     )) {
         return;
     }
@@ -18,22 +52,43 @@ console.log = (...args) => {
     // Suppress object dumps (SessionEntry, prekeys, ratchets)
     if (msg && typeof msg === 'object') {
         if (msg.constructor?.name === 'SessionEntry') return;
-        if (msg._chains || msg.currentRatchet || msg.registrationId) return;
+        if (msg._chains || msg.currentRatchet || msg.registrationId || msg.pendingPreKey) return;
         if (Buffer.isBuffer(msg)) return;
     }
 
     originalConsoleLog.apply(console, args);
 };
 
+console.error = (...args) => {
+    const msg = args[0];
+
+    // Suppress and auto-recover from session errors
+    if (typeof msg === 'string' && (
+        msg.includes('Bad MAC') ||
+        msg.includes('Session error') ||
+        msg.includes('Failed to decrypt') ||
+        msg.includes('MessageCounterError')
+    )) {
+        autoSessionClear(); // Auto-repair
+        return; // Suppress the log
+    }
+
+    // Suppress session object dumps in errors
+    if (msg && typeof msg === 'object') {
+        if (msg._chains || msg.currentRatchet || msg.registrationId) return;
+    }
+
+    originalConsoleError.apply(console, args);
+};
+
+
 require('./config');
 require('./settings');
 
 const { Boom } = require('@hapi/boom');
-const fs = require('fs');
 const chalk = require('chalk');
 const FileType = require('file-type');
 const syntaxerror = require('syntax-error');
-const path = require('path');
 const axios = require('axios');
 const PhoneNumber = require('awesome-phonenumber');
 const { imageToWebp, videoToWebp, writeExifImg, writeExifVid } = require('./lib/exif');
