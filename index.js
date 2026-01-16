@@ -342,10 +342,8 @@ async function startQasimDev() {
 
         QasimDev.ev.on('messages.upsert', async (chatUpdate) => {
             try {
-                // Direct Debug for Statuses
-                if (chatUpdate.messages?.[0]?.key?.remoteJid === 'status@broadcast') {
-                    console.log(`[RAW UPSERT] Status received! Type: ${chatUpdate.type}, Timestamp: ${chatUpdate.messages[0].messageTimestamp}`);
-                }
+                // Only process real-time messages, ignore history/append
+                if (chatUpdate.type !== 'notify') return;
 
                 const mek = chatUpdate.messages[0];
                 if (!mek.message) return;
