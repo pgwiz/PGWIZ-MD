@@ -116,32 +116,43 @@ async function reactToStatus(sock, statusKey) {
     }
 }
 
+// Track reacted statuses to prevent duplicates/loops
+const reactedStatuses = new Set();
+
+// Clear cache every hour to prevent memory leaks
+setInterval(() => reactedStatuses.clear(), 60 * 60 * 1000);
+
 async function handleStatusUpdate(sock, status) {
     try {
         const enabled = await isAutoStatusEnabled();
         if (!enabled) return;
-        // Removed artificial delay for speed
-        // await new Promise(resolve => setTimeout(resolve, 1000));
 
+        // Handle Messages (New Statuses)
         if (status.messages && status.messages.length > 0) {
             const msg = status.messages[0];
             if (msg.key && msg.key.remoteJid === 'status@broadcast') {
+                // Deduplicate: Don't react if already reacted
+                if (reactedStatuses.has(msg.key.id)) return;
+
+                reactedStatuses.add(msg.key.id);
                 await sock.readMessages([msg.key]).catch(() => { });
-                reactToStatus(sock, msg.key).catch(() => { }); // Fire and forget
+                reactToStatus(sock, msg.key).catch(() => { });
                 return;
             }
         }
 
+        // Handle Status Key Updates (Less common, but possible)
         if (status.key && status.key.remoteJid === 'status@broadcast') {
+            if (reactedStatuses.has(status.key.id)) return;
+
+            reactedStatuses.add(status.key.id);
             await sock.readMessages([status.key]).catch(() => { });
             reactToStatus(sock, status.key).catch(() => { });
             return;
         }
-        if (status.reaction && status.reaction.key.remoteJid === 'status@broadcast') {
-            await sock.readMessages([status.reaction.key]).catch(() => { });
-            reactToStatus(sock, status.reaction.key).catch(() => { });
-            return;
-        }
+
+        // REMOVED: status.reaction handling
+        // Reacting to a reaction causes infinite loops and is unnecessary.
 
     } catch (error) {
         // Silent fail for speed
