@@ -34,26 +34,27 @@ const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 
 console.log = (...args) => {
-    const msg = args[0];
+    // Check all arguments, not just the first one
+    for (const arg of args) {
+        // Suppress string-based session logs
+        if (typeof arg === 'string' && (
+            arg.includes('Closing session') ||
+            arg.includes('SessionEntry') ||
+            arg.includes('_chains') ||
+            arg.includes('registrationId') ||
+            arg.includes('pendingPreKey') ||
+            arg.includes('currentRatchet') ||
+            arg.includes('indexInfo')
+        )) {
+            return;
+        }
 
-    // Suppress string-based session logs
-    if (typeof msg === 'string' && (
-        msg.includes('Closing session') ||
-        msg.includes('SessionEntry') ||
-        msg.includes('_chains') ||
-        msg.includes('registrationId') ||
-        msg.includes('pendingPreKey') ||
-        msg.includes('currentRatchet') ||
-        msg.includes('indexInfo')
-    )) {
-        return;
-    }
-
-    // Suppress object dumps (SessionEntry, prekeys, ratchets)
-    if (msg && typeof msg === 'object') {
-        if (msg.constructor?.name === 'SessionEntry') return;
-        if (msg._chains || msg.currentRatchet || msg.registrationId || msg.pendingPreKey) return;
-        if (Buffer.isBuffer(msg)) return;
+        // Suppress object dumps (SessionEntry, prekeys, ratchets)
+        if (arg && typeof arg === 'object') {
+            if (arg.constructor?.name === 'SessionEntry') return;
+            if (arg._chains || arg.currentRatchet || arg.registrationId || arg.pendingPreKey) return;
+            if (Buffer.isBuffer(arg)) return;
+        }
     }
 
     originalConsoleLog.apply(console, args);
@@ -330,6 +331,9 @@ async function startQasimDev() {
             connectTimeoutMs: 60000,
             keepAliveIntervalMs: 10000, // Aggressive keep-alive for stability
         });
+
+        // Expose bot instance globally for /ping endpoint
+        global.botInstance = QasimDev;
 
         const originalSendPresenceUpdate = QasimDev.sendPresenceUpdate;
         const originalReadMessages = QasimDev.readMessages;
