@@ -5,10 +5,14 @@ const API_BASE = 'https://api3.wpg.qzz.io';
 const AXIOS_TIMEOUT = 60000;
 
 // Store pending searches: chatId -> [results]
-const pendingSelections = new Map();
+// Use global state to persist across hot-reloads
+global.songSelections = global.songSelections || new Map();
+const pendingSelections = global.songSelections;
 
 // Clear cache every hour
-setInterval(() => pendingSelections.clear(), 3600000);
+if (!global.songSelectionCleaner) {
+  global.songSelectionCleaner = setInterval(() => pendingSelections.clear(), 3600000);
+}
 
 async function handleSongSelection(sock, chatId, senderId, text, message) {
   if (!pendingSelections.has(chatId)) return false;
