@@ -18,15 +18,13 @@ async function handleSongSelection(sock, chatId, senderId, text, message) {
   if (!pendingSelections.has(chatId)) return false;
 
   const selectionIndex = parseInt(text.trim());
-  if (isNaN(selectionIndex)) return false; // Not a number, ignore (or maybe it's a new command)
+  if (isNaN(selectionIndex)) return false;
 
   const storedData = pendingSelections.get(chatId);
-  // Check if user is the one who searched? Optional, but good practice. 
-  // For now, allow anyone in chat to pick to act fast.
 
   // Validate range
   if (selectionIndex < 1 || selectionIndex > storedData.results.length) {
-    return false; // Out of bounds, maybe they meant something else
+    return false;
   }
 
   const selectedVideo = storedData.results[selectionIndex - 1];
@@ -111,12 +109,11 @@ async function handleSongSelection(sock, chatId, senderId, text, message) {
 
     await sock.sendMessage(chatId, { react: { text: '⬆️', key: message.key } });
 
-    // Send Audio
+    // Send Audio as Document
     await sock.sendMessage(chatId, {
-      audio: audioStream.data,
+      document: audioStream.data,
       mimetype: 'audio/mpeg',
       fileName: `${videoInfo.title}.mp3`,
-      ptt: false,
       contextInfo: {
         externalAdReply: {
           title: videoInfo.title,
@@ -137,14 +134,14 @@ async function handleSongSelection(sock, chatId, senderId, text, message) {
     await sock.sendMessage(chatId, {
       text: `❌ Failed to download song. ${err.message}`,
     }, { quoted: message });
-    return true; // Handled
+    return true;
   }
 }
 
 module.exports = {
-  handleSongSelection, // Export for messageHandler
+  handleSongSelection,
   command: 'song',
-  aliases: ['music', 'play', 'mp3'],
+  aliases: ['music', 'play', 'mp3', 'songdoc'],
   category: 'music',
   description: 'Play music from YouTube (Search & Select)',
   usage: '.song <song name>',
@@ -158,12 +155,6 @@ module.exports = {
         text: '🎵 *Music Player*\n\nUsage:\n.song <song name>'
       }, { quoted: message });
     }
-
-    // If URL, trigger download immediately (bypass selection)
-    // Actually, let's reuse handleSelection logic or keep separate?
-    // Reuse is cleaner but for now I'll just keep URL handling simple 
-    // OR format the URL as a single "result" and auto-select 1?
-    // Let's keep URL automatic separation.
 
     if (query.match(/^https?:\/\//)) {
       // Treat as Direct URL - Mock a "selection" of index 1
