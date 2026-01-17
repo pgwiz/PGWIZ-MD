@@ -61,22 +61,29 @@ console.log = (...args) => {
 };
 
 console.error = (...args) => {
-    const msg = args[0];
+    // Check all arguments for session-related content
+    for (const arg of args) {
+        // Suppress and auto-recover from session errors
+        if (typeof arg === 'string' && (
+            arg.includes('Bad MAC') ||
+            arg.includes('Session error') ||
+            arg.includes('Failed to decrypt') ||
+            arg.includes('MessageCounterError') ||
+            arg.includes('Closing session') ||
+            arg.includes('SessionEntry') ||
+            arg.includes('Decrypted message')
+        )) {
+            if (arg.includes('Bad MAC')) {
+                autoSessionClear(); // Auto-repair
+            }
+            return; // Suppress the log
+        }
 
-    // Suppress and auto-recover from session errors
-    if (typeof msg === 'string' && (
-        msg.includes('Bad MAC') ||
-        msg.includes('Session error') ||
-        msg.includes('Failed to decrypt') ||
-        msg.includes('MessageCounterError')
-    )) {
-        autoSessionClear(); // Auto-repair
-        return; // Suppress the log
-    }
-
-    // Suppress session object dumps in errors
-    if (msg && typeof msg === 'object') {
-        if (msg._chains || msg.currentRatchet || msg.registrationId) return;
+        // Suppress session object dumps in errors
+        if (arg && typeof arg === 'object') {
+            if (arg._chains || arg.currentRatchet || arg.registrationId || arg.pendingPreKey) return;
+            if (Buffer.isBuffer(arg)) return;
+        }
     }
 
     originalConsoleError.apply(console, args);
@@ -313,7 +320,7 @@ async function startQasimDev() {
             browser: Browsers.ubuntu('Chrome'), // Better for Linux/PM2 servers
             auth: {
                 creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
             },
             markOnlineOnConnect: !isGhostActive,
             generateHighQualityLinkPreview: true,
