@@ -1,4 +1,4 @@
-﻿ # Dependencies
+﻿test raw url https://api3.wpg.qzz.io # Dependencies
  node_modules/
  package-lock.json
 
@@ -36,3 +36,4 @@
  *.sw?
 
  .env
+node_modules
