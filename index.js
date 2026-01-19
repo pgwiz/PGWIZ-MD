@@ -643,18 +643,6 @@ async function startQasimDev() {
                     printLog('error', `Failed to send connection message: ${error.message}`);
                 }
 
-                // Internal Keep-Alive Monitor - Ping every 5 minutes
-                setInterval(async () => {
-                    try {
-                        if (QasimDev && QasimDev.user) {
-                            // Internal ping to keep connection alive
-                            await QasimDev.sendPresenceUpdate('available');
-                            printLog('info', '💓 Internal keep-alive ping sent');
-                        }
-                    } catch (error) {
-                        printLog('error', `Keep-alive ping failed: ${error.message}`);
-                    }
-                }, 5 * 60 * 1000); // 5 minutes
 
                 // Verbose startup banner disabled
                 // await delay(1999);
