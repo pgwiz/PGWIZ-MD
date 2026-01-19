@@ -138,16 +138,34 @@ async function updateViaZip(sock, chatId, message, zipOverride) {
 
   const [root] = fs.readdirSync(extractTo).map(n => path.join(extractTo, n));
   const srcRoot = fs.existsSync(root) && fs.lstatSync(root).isDirectory() ? root : extractTo;
-  const ignore = ['node_modules', '.git', 'session', 'tmp', 'tmp/', 'temp', 'data', 'baileys_store.json'];
+  const ignore = ['node_modules', '.git', 'session', 'tmp', 'tmp/', 'temp', 'data', 'baileys_store.json', '.env'];
   const copied = [];
   let preservedOwner = null;
   let preservedBotOwner = null;
+
+  // Preserve .env file
+  let preservedEnv = null;
+  const envPath = path.join(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    try {
+      preservedEnv = fs.readFileSync(envPath, 'utf8');
+    } catch { }
+  }
+
   try {
     const currentSettings = require('../settings');
     preservedOwner = currentSettings && currentSettings.ownerNumber ? String(currentSettings.ownerNumber) : null;
     preservedBotOwner = currentSettings && currentSettings.botOwner ? String(currentSettings.botOwner) : null;
   } catch { }
   copyRecursive(srcRoot, process.cwd(), ignore, '', copied);
+
+  // Restore .env file if it was preserved
+  if (preservedEnv) {
+    try {
+      fs.writeFileSync(envPath, preservedEnv);
+    } catch { }
+  }
+
   if (preservedOwner) {
     try {
       const settingsPath = path.join(process.cwd(), 'settings.js');

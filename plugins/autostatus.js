@@ -45,8 +45,38 @@ async function readConfig() {
     try {
         if (HAS_DB) {
             const config = await store.getSetting('global', 'autoStatus');
+
+            // If no config exists, check environment variables for initial setup
+            if (!config) {
+                const envEnabled = process.env.AUTO_STATUS_VIEW === 'true';
+                const envReactOn = process.env.AUTO_STATUS_REACT === 'true';
+
+                if (envEnabled || envReactOn) {
+                    const initialConfig = { enabled: envEnabled, reactOn: envReactOn };
+                    await store.saveSetting('global', 'autoStatus', initialConfig);
+                    console.log('[AUTOSTATUS] Initialized from environment variables:', initialConfig);
+                    return initialConfig;
+                }
+            }
+
             return config || { enabled: false, reactOn: false };
         } else {
+            // File system mode
+            if (!fs.existsSync(configPath)) {
+                // Check environment variables for initial setup
+                const envEnabled = process.env.AUTO_STATUS_VIEW === 'true';
+                const envReactOn = process.env.AUTO_STATUS_REACT === 'true';
+
+                const initialConfig = { enabled: envEnabled, reactOn: envReactOn };
+                fs.writeFileSync(configPath, JSON.stringify(initialConfig, null, 2));
+
+                if (envEnabled || envReactOn) {
+                    console.log('[AUTOSTATUS] Initialized from environment variables:', initialConfig);
+                }
+
+                return initialConfig;
+            }
+
             const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
             return {
                 enabled: !!config.enabled,
@@ -59,6 +89,38 @@ async function readConfig() {
     }
 }
 
+// Helper function to update .env file
+function updateEnvFile(key, value) {
+    try {
+        const envPath = path.join(__dirname, '../.env');
+        if (!fs.existsSync(envPath)) return;
+
+        let envContent = fs.readFileSync(envPath, 'utf8');
+        const lines = envContent.split('\n');
+        let found = false;
+
+        // Update existing key or add if not found
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.startsWith(`${key}=`)) {
+                lines[i] = `${key}="${value}"`;
+                found = true;
+                break;
+            }
+        }
+
+        // If key not found, add it
+        if (!found) {
+            lines.push(`${key}="${value}"`);
+        }
+
+        fs.writeFileSync(envPath, lines.join('\n'));
+        console.log(`[ENV] Updated ${key}="${value}"`);
+    } catch (error) {
+        console.error('[ENV] Error updating .env file:', error.message);
+    }
+}
+
 async function writeConfig(config) {
     try {
         if (HAS_DB) {
@@ -66,6 +128,10 @@ async function writeConfig(config) {
         } else {
             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
         }
+
+        // Sync to .env file
+        updateEnvFile('AUTO_STATUS_VIEW', config.enabled ? 'true' : 'false');
+        updateEnvFile('AUTO_STATUS_REACT', config.reactOn ? 'true' : 'false');
     } catch (error) {
         console.error('Error writing auto status config:', error);
     }
