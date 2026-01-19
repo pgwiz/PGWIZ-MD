@@ -34,9 +34,27 @@ const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 
 console.log = (...args) => {
-    // Check all arguments, not just the first one
+    // First pass: Check for objects that should be suppressed (before string conversion)
     for (const arg of args) {
-        // Suppress string-based session logs
+        if (arg && typeof arg === 'object') {
+            // Suppress SessionEntry objects completely
+            if (arg.constructor?.name === 'SessionEntry') {
+                return; // Completely suppress, don't even show registrationId
+            }
+            // Suppress any object with session-related properties
+            if (arg._chains || arg.currentRatchet || (arg.registrationId && arg.indexInfo) || arg.pendingPreKey) {
+                return;
+            }
+            // Suppress Buffer objects
+            if (Buffer.isBuffer(arg)) return;
+
+            // Suppress objects with ephemeralKeyPair (session ratchet data)
+            if (arg.ephemeralKeyPair || arg.lastRemoteEphemeralKey || arg.rootKey) return;
+        }
+    }
+
+    // Second pass: Check string arguments
+    for (const arg of args) {
         if (typeof arg === 'string' && (
             arg.includes('Closing session') ||
             arg.includes('SessionEntry') ||
@@ -54,26 +72,26 @@ console.log = (...args) => {
         )) {
             return;
         }
-
-        // Suppress object dumps (SessionEntry, prekeys, ratchets)
-        if (arg && typeof arg === 'object') {
-            if (arg.constructor?.name === 'SessionEntry') {
-                // Show minimal info instead of full dump
-                originalConsoleLog(`Session closed [registrationId: ${arg.registrationId || 'N/A'}]`);
-                return;
-            }
-            if (arg._chains || arg.currentRatchet || arg.registrationId || arg.pendingPreKey) return;
-            if (Buffer.isBuffer(arg)) return;
-        }
     }
 
     originalConsoleLog.apply(console, args);
 };
 
 console.error = (...args) => {
-    // Check all arguments for session-related content
+    // First pass: Check for objects that should be suppressed
     for (const arg of args) {
-        // Suppress and auto-recover from session errors
+        if (arg && typeof arg === 'object') {
+            // Suppress SessionEntry objects
+            if (arg.constructor?.name === 'SessionEntry') return;
+            // Suppress session-related objects
+            if (arg._chains || arg.currentRatchet || (arg.registrationId && arg.indexInfo) || arg.pendingPreKey) return;
+            if (Buffer.isBuffer(arg)) return;
+            if (arg.ephemeralKeyPair || arg.lastRemoteEphemeralKey || arg.rootKey) return;
+        }
+    }
+
+    // Second pass: Check string arguments for session-related content
+    for (const arg of args) {
         if (typeof arg === 'string' && (
             arg.includes('Bad MAC') ||
             arg.includes('Session error') ||
@@ -81,18 +99,15 @@ console.error = (...args) => {
             arg.includes('MessageCounterError') ||
             arg.includes('Closing session') ||
             arg.includes('SessionEntry') ||
-            arg.includes('Decrypted message')
+            arg.includes('Decrypted message') ||
+            arg.includes('_chains') ||
+            arg.includes('currentRatchet') ||
+            arg.includes('pendingPreKey')
         )) {
             if (arg.includes('Bad MAC')) {
                 autoSessionClear(); // Auto-repair
             }
             return; // Suppress the log
-        }
-
-        // Suppress session object dumps in errors
-        if (arg && typeof arg === 'object') {
-            if (arg._chains || arg.currentRatchet || arg.registrationId || arg.pendingPreKey) return;
-            if (Buffer.isBuffer(arg)) return;
         }
     }
 
