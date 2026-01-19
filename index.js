@@ -44,14 +44,24 @@ console.log = (...args) => {
             arg.includes('registrationId') ||
             arg.includes('pendingPreKey') ||
             arg.includes('currentRatchet') ||
-            arg.includes('indexInfo')
+            arg.includes('indexInfo') ||
+            arg.includes('ephemeralKeyPair') ||
+            arg.includes('lastRemoteEphemeralKey') ||
+            arg.includes('baseKey') ||
+            arg.includes('chainKey') ||
+            arg.includes('chainType') ||
+            arg.includes('messageKeys')
         )) {
             return;
         }
 
         // Suppress object dumps (SessionEntry, prekeys, ratchets)
         if (arg && typeof arg === 'object') {
-            if (arg.constructor?.name === 'SessionEntry') return;
+            if (arg.constructor?.name === 'SessionEntry') {
+                // Show minimal info instead of full dump
+                originalConsoleLog(`Session closed [registrationId: ${arg.registrationId || 'N/A'}]`);
+                return;
+            }
             if (arg._chains || arg.currentRatchet || arg.registrationId || arg.pendingPreKey) return;
             if (Buffer.isBuffer(arg)) return;
         }
@@ -617,6 +627,19 @@ async function startQasimDev() {
                 } catch (error) {
                     printLog('error', `Failed to send connection message: ${error.message}`);
                 }
+
+                // Internal Keep-Alive Monitor - Ping every 5 minutes
+                setInterval(async () => {
+                    try {
+                        if (QasimDev && QasimDev.user) {
+                            // Internal ping to keep connection alive
+                            await QasimDev.sendPresenceUpdate('available');
+                            printLog('info', '💓 Internal keep-alive ping sent');
+                        }
+                    } catch (error) {
+                        printLog('error', `Keep-alive ping failed: ${error.message}`);
+                    }
+                }, 5 * 60 * 1000); // 5 minutes
 
                 // Verbose startup banner disabled
                 // await delay(1999);
