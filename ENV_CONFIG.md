@@ -125,19 +125,128 @@ REMOVEBG_KEY="your_api_key_here"
 
 ## 🚀 How It Works
 
-### First-Time Initialization
+### **Bidirectional Sync** 🔄
+
+The bot now supports **two-way synchronization** between `.env` file and the database/config files:
+
+#### **📥 Read from `.env` (Initialization)**
 
 When you start the bot for the **first time** (no existing database or config files):
 
-1. **Auto Status**: If `AUTO_STATUS_VIEW` or `AUTO_STATUS_REACT` is set to `"true"`, the bot will automatically enable these features
-2. **Sudo Users**: If `SUDO_USERS` contains phone numbers, they will be automatically added as sudo users
+1. **Auto Status**: 
+   - Reads `AUTO_STATUS_VIEW` and `AUTO_STATUS_REACT` from `.env`
+   - Initializes settings in database/config files
+   - Logs: `[AUTOSTATUS] Initialized from environment variables`
 
-### Subsequent Runs
+2. **Sudo Users**:
+   - Reads `SUDO_USERS` from `.env`
+   - Parses comma-separated phone numbers
+   - Adds them to database/config files
+   - Logs: `[SUDO] Initialized from environment variables`
 
-After the first initialization:
-- Settings are stored in the database/files
-- Environment variables are **only checked on first run**
-- Use bot commands (`.autostatus`, `.sudo`) to modify settings later
+#### **📤 Write to `.env` (Sync Back)**
+
+When you change settings via bot commands:
+
+1. **Auto Status Commands** (`.autostatus on/off`, `.autostatus react on/off`):
+   - Updates database/config files
+   - **Automatically writes back to `.env`**
+   - Updates `AUTO_STATUS_VIEW` and `AUTO_STATUS_REACT`
+   - Logs: `[ENV] Updated AUTO_STATUS_VIEW="true"`
+
+2. **Sudo Commands** (`.sudo add`, `.sudo del`):
+   - Updates database/config files
+   - **Automatically writes back to `.env`**
+   - Updates `SUDO_USERS` with current list
+   - Logs: `[ENV] Updated SUDO_USERS="254789462334,1234567890"`
+
+#### **✨ Benefits**
+
+- ✅ **Always in Sync**: `.env` file always reflects current settings
+- ✅ **Portable**: Copy `.env` to another deployment and settings carry over
+- ✅ **Transparent**: See current configuration at a glance
+- ✅ **No Manual Editing**: Bot manages `.env` for you
+
+---
+
+## 📝 Example Workflow
+
+### Initial Setup
+
+1. **Edit `.env`**:
+```env
+AUTO_STATUS_VIEW="true"
+AUTO_STATUS_REACT="true"
+SUDO_USERS="254789462334,1234567890"
+```
+
+2. **Start Bot**:
+```bash
+npm start
+```
+
+3. **Bot Logs**:
+```
+[AUTOSTATUS] Initialized from environment variables: { enabled: true, reactOn: true }
+[SUDO] Initialized from environment variables: [ '254789462334@s.whatsapp.net', '1234567890@s.whatsapp.net' ]
+```
+
+### Changing Settings via Commands
+
+1. **Disable Auto React**:
+```
+.autostatus react off
+```
+
+2. **Bot Updates `.env`**:
+```
+[ENV] Updated AUTO_STATUS_REACT="false"
+```
+
+3. **Your `.env` Now Shows**:
+```env
+AUTO_STATUS_VIEW="true"
+AUTO_STATUS_REACT="false"  # ← Automatically updated!
+SUDO_USERS="254789462334,1234567890"
+```
+
+### Adding Sudo User
+
+1. **Add User**:
+```
+.sudo add @user
+```
+
+2. **Bot Updates `.env`**:
+```
+[ENV] Updated SUDO_USERS="254789462334,1234567890,9876543210"
+```
+
+3. **Your `.env` Now Shows**:
+```env
+SUDO_USERS="254789462334,1234567890,9876543210"  # ← Automatically updated!
+```
+
+---
+
+## 🔄 Re-initializing from Environment Variables
+
+You **don't need to** re-initialize anymore! The `.env` file is always kept in sync.
+
+However, if you want to force a reset:
+
+**Option 1: Delete database**
+```bash
+rm baileys_store.db
+```
+
+**Option 2: Delete config files**
+```bash
+rm data/autoStatus.json
+rm data/userGroupData.json
+```
+
+Then restart the bot, and it will read from `.env` again.
 
 ---
 
