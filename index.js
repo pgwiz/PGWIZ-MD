@@ -314,9 +314,11 @@ async function initializeSession() {
     }
 }
 
-server.listen(PORT, () => {
-    printLog('success', `Server listening on port ${PORT}`);
-});
+if (!server.listening) {
+    server.listen(PORT, () => {
+        printLog('success', `Server listening on port ${PORT}`);
+    });
+}
 
 async function startQasimDev() {
     try {
