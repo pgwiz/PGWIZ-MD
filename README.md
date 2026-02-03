@@ -44,7 +44,7 @@ Click the button below to fork the PGWIZ-MD repository to your GitHub account:
 Easily connect to your WhatsApp account by pair code.
 
 <div align="center">
-  <a href="https://mega-pairing.onrender.com" target="_blank">
+  <a href="https://session-s.pgwiz.cloud" target="_blank">
     <img src="https://img.shields.io/badge/SESSION-ID-ff4d4d?style=for-the-badge" alt="Generate Pair Code"/>
   </a>
 </div>
