@@ -29,47 +29,67 @@ function autoSessionClear() {
     } catch { }
 }
 
-// Suppress Baileys internal session/prekey/BadMAC logs
+// Suppress Baileys internal session/prekey/BadMAC logs - AGGRESSIVE suppression
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
 
-// Keywords that should be completely suppressed
-const SUPPRESS_KEYWORDS = [
-    'Closing session', 'SessionEntry', '_chains', 'registrationId', 'pendingPreKey',
-    'currentRatchet', 'indexInfo', 'ephemeralKeyPair', 'lastRemoteEphemeralKey',
-    'baseKey', 'chainKey', 'chainType', 'messageKeys', 'Signal key',
-    'Decrypt error', 'Failed to decrypt', 'Bad MAC', 'Session error',
-    'MessageCounterError', 'Decrypted message', 'Curve25519', 'HKDF-SHA256',
-    'preKey', 'signedPreKey', 'identity key', 'ratchet', 'rootKey'
-];
+// Keywords that should be completely suppressed (as Set for faster lookup)
+const SUPPRESS_KEYWORDS = new Set([
+    'closing session', 'sessionentry', '_chains', 'registrationid', 'pendingprekey',
+    'currentratchet', 'indexinfo', 'ephemeralkeypair', 'lastremoteephemeralkey',
+    'basekey', 'chainkey', 'chaintype', 'messagekeys', 'signal key',
+    'decrypt error', 'failed to decrypt', 'bad mac', 'session error',
+    'messagecountererror', 'decrypted message', 'curve25519', 'hkdf-sha256',
+    'prekey', 'signedprekey', 'identity key', 'ratchet', 'rootkey', 'noisekey',
+    'signedbundle', 'xmppframing', 'sending presence', 'message counter'
+]);
 
 const shouldSuppress = (args) => {
+    // First, check if any argument is a SessionEntry-like object or Buffer key
     for (const arg of args) {
-        // Suppress SessionEntry and similar objects
-        if (arg && typeof arg === 'object') {
-            const name = arg.constructor?.name || '';
-            if (name.includes('SessionEntry') || name.includes('Session') || name.includes('Ratchet')) {
-                return true;
-            }
-            if (arg._chains || arg.currentRatchet || arg.registrationId || arg.pendingPreKey ||
-                arg.ephemeralKeyPair || arg.lastRemoteEphemeralKey || arg.rootKey || arg.keyPair) {
-                return true;
-            }
-            if (Buffer.isBuffer(arg) && arg.length > 10) {
-                // Check if this looks like a key buffer (most keys are base64-encoded hex with high entropy)
-                const str = arg.toString();
-                if (str.match(/^[A-Fa-f0-9]{64,}/)) return true; // Looks like hex key
-            }
-        }
+        if (!arg) continue;
 
-        if (typeof arg === 'string') {
-            const lower = arg.toLowerCase();
-            if (SUPPRESS_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()))) {
+        if (typeof arg === 'object') {
+            const name = arg.constructor?.name || '';
+
+            // Direct object type checks
+            if (name.includes('SessionEntry') || name.includes('Session') ||
+                name.includes('Ratchet') || name.includes('Signal')) {
+                return true;
+            }
+
+            // Check for session-related properties
+            if (arg._chains || arg.currentRatchet || arg.registrationId || arg.pendingPreKey ||
+                arg.ephemeralKeyPair || arg.lastRemoteEphemeralKey || arg.rootKey || arg.keyPair ||
+                arg.noiseKey || arg.signedPreKey || arg.signedIdentityKey) {
+                return true;
+            }
+
+            // Suppress large Buffers (likely encryption keys, > 20 bytes)
+            if (Buffer.isBuffer(arg) && arg.length > 20) {
                 return true;
             }
         }
     }
+
+    // Check string arguments for suppression keywords
+    for (const arg of args) {
+        if (typeof arg !== 'string') continue;
+
+        const lower = arg.toLowerCase();
+
+        // Check for any suppression keyword
+        for (const keyword of SUPPRESS_KEYWORDS) {
+            if (lower.includes(keyword)) return true;
+        }
+
+        // Suppress things that look like object stringifications
+        if (lower.includes('<buffer') || lower.includes('pubkey') || lower.includes('privkey')) {
+            return true;
+        }
+    }
+
     return false;
 };
 
