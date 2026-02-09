@@ -32,86 +32,69 @@ function autoSessionClear() {
 // Suppress Baileys internal session/prekey/BadMAC logs
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+// Keywords that should be completely suppressed
+const SUPPRESS_KEYWORDS = [
+    'Closing session', 'SessionEntry', '_chains', 'registrationId', 'pendingPreKey',
+    'currentRatchet', 'indexInfo', 'ephemeralKeyPair', 'lastRemoteEphemeralKey',
+    'baseKey', 'chainKey', 'chainType', 'messageKeys', 'Signal key',
+    'Decrypt error', 'Failed to decrypt', 'Bad MAC', 'Session error',
+    'MessageCounterError', 'Decrypted message', 'Curve25519', 'HKDF-SHA256',
+    'preKey', 'signedPreKey', 'identity key', 'ratchet', 'rootKey'
+];
+
+const shouldSuppress = (args) => {
+    for (const arg of args) {
+        // Suppress SessionEntry and similar objects
+        if (arg && typeof arg === 'object') {
+            const name = arg.constructor?.name || '';
+            if (name.includes('SessionEntry') || name.includes('Session') || name.includes('Ratchet')) {
+                return true;
+            }
+            if (arg._chains || arg.currentRatchet || arg.registrationId || arg.pendingPreKey ||
+                arg.ephemeralKeyPair || arg.lastRemoteEphemeralKey || arg.rootKey || arg.keyPair) {
+                return true;
+            }
+            if (Buffer.isBuffer(arg) && arg.length > 10) {
+                // Check if this looks like a key buffer (most keys are base64-encoded hex with high entropy)
+                const str = arg.toString();
+                if (str.match(/^[A-Fa-f0-9]{64,}/)) return true; // Looks like hex key
+            }
+        }
+
+        if (typeof arg === 'string') {
+            const lower = arg.toLowerCase();
+            if (SUPPRESS_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()))) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
 
 console.log = (...args) => {
-    // First pass: Check for objects that should be suppressed (before string conversion)
-    for (const arg of args) {
-        if (arg && typeof arg === 'object') {
-            // Suppress SessionEntry objects completely
-            if (arg.constructor?.name === 'SessionEntry') {
-                return; // Completely suppress, don't even show registrationId
-            }
-            // Suppress any object with session-related properties
-            if (arg._chains || arg.currentRatchet || (arg.registrationId && arg.indexInfo) || arg.pendingPreKey) {
-                return;
-            }
-            // Suppress Buffer objects
-            if (Buffer.isBuffer(arg)) return;
-
-            // Suppress objects with ephemeralKeyPair (session ratchet data)
-            if (arg.ephemeralKeyPair || arg.lastRemoteEphemeralKey || arg.rootKey) return;
-        }
-    }
-
-    // Second pass: Check string arguments
-    for (const arg of args) {
-        if (typeof arg === 'string' && (
-            arg.includes('Closing session') ||
-            arg.includes('SessionEntry') ||
-            arg.includes('_chains') ||
-            arg.includes('registrationId') ||
-            arg.includes('pendingPreKey') ||
-            arg.includes('currentRatchet') ||
-            arg.includes('indexInfo') ||
-            arg.includes('ephemeralKeyPair') ||
-            arg.includes('lastRemoteEphemeralKey') ||
-            arg.includes('baseKey') ||
-            arg.includes('chainKey') ||
-            arg.includes('chainType') ||
-            arg.includes('messageKeys')
-        )) {
-            return;
-        }
-    }
-
+    if (shouldSuppress(args)) return;
     originalConsoleLog.apply(console, args);
 };
 
 console.error = (...args) => {
-    // First pass: Check for objects that should be suppressed
-    for (const arg of args) {
-        if (arg && typeof arg === 'object') {
-            // Suppress SessionEntry objects
-            if (arg.constructor?.name === 'SessionEntry') return;
-            // Suppress session-related objects
-            if (arg._chains || arg.currentRatchet || (arg.registrationId && arg.indexInfo) || arg.pendingPreKey) return;
-            if (Buffer.isBuffer(arg)) return;
-            if (arg.ephemeralKeyPair || arg.lastRemoteEphemeralKey || arg.rootKey) return;
+    if (shouldSuppress(args)) {
+        // Auto-repair on Bad MAC errors
+        const badMacFound = args.some(arg =>
+            typeof arg === 'string' && arg.toLowerCase().includes('bad mac')
+        );
+        if (badMacFound) {
+            autoSessionClear();
         }
+        return;
     }
-
-    // Second pass: Check string arguments for session-related content
-    for (const arg of args) {
-        if (typeof arg === 'string' && (
-            arg.includes('Bad MAC') ||
-            arg.includes('Session error') ||
-            arg.includes('Failed to decrypt') ||
-            arg.includes('MessageCounterError') ||
-            arg.includes('Closing session') ||
-            arg.includes('SessionEntry') ||
-            arg.includes('Decrypted message') ||
-            arg.includes('_chains') ||
-            arg.includes('currentRatchet') ||
-            arg.includes('pendingPreKey')
-        )) {
-            if (arg.includes('Bad MAC')) {
-                autoSessionClear(); // Auto-repair
-            }
-            return; // Suppress the log
-        }
-    }
-
     originalConsoleError.apply(console, args);
+};
+
+console.warn = (...args) => {
+    if (shouldSuppress(args)) return;
+    originalConsoleWarn.apply(console, args);
 };
 
 
