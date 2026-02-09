@@ -101,6 +101,13 @@ console.warn = (...args) => {
 require('./config');
 require('./settings');
 
+const { Writable } = require('stream');
+
+// Create a null stream that discards all output for Pino
+const nullStream = new Writable({
+    write() {} // Do nothing - discard all output
+});
+
 const { Boom } = require('@hapi/boom');
 const chalk = require('chalk');
 const FileType = require('file-type');
@@ -325,12 +332,12 @@ async function startQasimDev() {
 
         const QasimDev = makeWASocket({
             version,
-            logger: pino({ level: 'silent' }), // Keep silent logger to reduce noise
+            logger: pino({ level: 'silent' }, nullStream), // Silent logger with null stream
             printQRInTerminal: !pairingCode,
             browser: Browsers.ubuntu('Chrome'), // Better for Linux/PM2 servers
             auth: {
                 creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }, nullStream)),
             },
             markOnlineOnConnect: !isGhostActive,
             generateHighQualityLinkPreview: true,
