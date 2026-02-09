@@ -679,6 +679,10 @@ async function startQasimDev() {
                     console.log(chalk.bold.redBright(`⚠️  SESSION CONFLICT (Status 440)`));
                     console.log(chalk.red(`   Another instance is already using this session.`));
                     console.log(chalk.red(`   Please stop other running bots (Local, Koyeb, etc).`));
+                    console.log(chalk.red(`   Waiting 30 seconds before reconnect attempt...`));
+                    // For 440 errors, wait much longer and exit aggressively
+                    await delay(30000);
+                    process.exit(1); // Force restart to clear socket state
                 } else if (reason === 401) { // Logged out
                     console.log(chalk.redBright(`⚠️  Session Logged Out. Please re-pair.`));
                 }
@@ -749,9 +753,11 @@ async function startQasimDev() {
                     }
                 }
 
-                if (shouldReconnect) {
-                    printLog('connection', 'Reconnecting in 5 seconds...');
-                    await delay(5000);
+                // For non-440 errors, use exponential backoff
+                if (shouldReconnect && statusCode !== 440) {
+                    const waitTime = 8000; // Wait 8 seconds for other errors
+                    printLog('connection', `Reconnecting in ${waitTime/1000} seconds...`);
+                    await delay(waitTime);
                     startQasimDev();
                 }
             }
