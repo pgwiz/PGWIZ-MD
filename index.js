@@ -35,46 +35,9 @@ function autoSessionClear() {
     } catch { }
 }
 
-// Stream-level suppression (more reliable - catches all output)
-const SUPPRESS_PATTERNS = [
-    /closing session/i,
-    /sessionentry/i,
-    /_chains/i,
-    /registrationid/i,
-    /ephemeralkeypair/i,
-    /lastremoteephemeralkey/i,
-    /currentratchet/i,
-    /bad mac/i,
-    /message counter/i,
-    /pubkey.*buffer/i,
-    /privkey.*buffer/i,
-    /sending presence/i,
-    /<buffer/i
-];
-
-const originalStdoutWrite = process.stdout.write.bind(process.stdout);
-const originalStderrWrite = process.stderr.write.bind(process.stderr);
-
-const shouldSuppressOutput = (chunk) => {
-    const str = chunk.toString ? chunk.toString() : String(chunk);
-    return SUPPRESS_PATTERNS.some(pattern => pattern.test(str));
-};
-
-process.stdout.write = (chunk, ...args) => {
-    if (!shouldSuppressOutput(chunk)) {
-        return originalStdoutWrite(chunk, ...args);
-    }
-    // Return true to indicate written (but actually discarded)
-    return true;
-};
-
-process.stderr.write = (chunk, ...args) => {
-    if (!shouldSuppressOutput(chunk)) {
-        return originalStderrWrite(chunk, ...args);
-    }
-    // Return true to indicate written (but actually discarded)
-    return true;
-};
+// Stream-level suppression disabled on Koyeb/container platforms to prevent log duplication
+// The console.log/error/warn overrides are sufficient for suppressing encryption logs
+// On Koyeb, stream-level overrides cause output duplication in the custom logging layer
 
 // Suppress Baileys internal session/prekey/BadMAC logs - AGGRESSIVE suppression
 const originalConsoleLog = console.log;
