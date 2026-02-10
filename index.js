@@ -7,7 +7,7 @@ const path = require('path');
 let lastSessionClear = 0;
 function autoSessionClear() {
     const now = Date.now();
-    if (now - lastSessionClear < 60000) return; // Rate limit: once per minute
+    if (now - lastSessionClear < 120000) return; // Rate limit: once per 2 minutes
     lastSessionClear = now;
 
     const sessionDir = path.join(__dirname, 'session');
@@ -17,58 +17,27 @@ function autoSessionClear() {
         const files = fs.readdirSync(sessionDir);
         let cleared = 0;
         for (const file of files) {
-            if (file === 'creds.json') continue; // Keep main credentials
+            // Only keep creds.json - clear everything else including auth files
+            if (file === 'creds.json') continue;
             try {
                 fs.unlinkSync(path.join(sessionDir, file));
                 cleared++;
             } catch { }
         }
         if (cleared > 0) {
-            console.log(`[AUTO-REPAIR] Cleared ${cleared} corrupted session files`);
+            console.log(`[AUTO-REPAIR] Cleared ${cleared} corrupted session files - Session will re-initialize on next connection`);
+            // Force exit so PM2/systemd can restart with clean state
+            console.log(`[AUTO-REPAIR] Restarting bot in 3 seconds for clean recovery...`);
+            setTimeout(() => {
+                process.exit(0);
+            }, 3000);
         }
     } catch { }
 }
 
-// Stream-level suppression (more reliable - catches all output)
-const SUPPRESS_PATTERNS = [
-    /closing session/i,
-    /sessionentry/i,
-    /_chains/i,
-    /registrationid/i,
-    /ephemeralkeypair/i,
-    /lastremoteephemeralkey/i,
-    /currentratchet/i,
-    /bad mac/i,
-    /message counter/i,
-    /pubkey.*buffer/i,
-    /privkey.*buffer/i,
-    /sending presence/i,
-    /<buffer/i
-];
-
-const originalStdoutWrite = process.stdout.write.bind(process.stdout);
-const originalStderrWrite = process.stderr.write.bind(process.stderr);
-
-const shouldSuppressOutput = (chunk) => {
-    const str = chunk.toString ? chunk.toString() : String(chunk);
-    return SUPPRESS_PATTERNS.some(pattern => pattern.test(str));
-};
-
-process.stdout.write = (chunk, ...args) => {
-    if (!shouldSuppressOutput(chunk)) {
-        return originalStdoutWrite(chunk, ...args);
-    }
-    // Return true to indicate written (but actually discarded)
-    return true;
-};
-
-process.stderr.write = (chunk, ...args) => {
-    if (!shouldSuppressOutput(chunk)) {
-        return originalStderrWrite(chunk, ...args);
-    }
-    // Return true to indicate written (but actually discarded)
-    return true;
-};
+// Stream-level suppression disabled on Koyeb/container platforms to prevent log duplication
+// The console.log/error/warn overrides are sufficient for suppressing encryption logs
+// On Koyeb, stream-level overrides cause output duplication in the custom logging layer
 
 // Suppress Baileys internal session/prekey/BadMAC logs - AGGRESSIVE suppression
 const originalConsoleLog = console.log;
@@ -343,24 +312,27 @@ async function initializeSession() {
         return false;
     }
 
-    if (hasValidSession()) {
-        return true;
-    }
-
+    // Always refresh session from service to prevent staleness
     try {
+        printLog('info', 'Refreshing session credentials from PGWIZ service...');
         await SaveCreds(txt);
-        await delay(2000);
+        await delay(1500);
 
         if (hasValidSession()) {
-            printLog('success', 'Session file verified and valid');
-            await delay(1000);
+            printLog('success', 'Session refreshed and verified');
+            await delay(500);
             return true;
         } else {
-            printLog('error', 'Session file not valid after download');
+            printLog('error', 'Session file not valid after refresh');
             return false;
         }
     } catch (error) {
-        printLog('error', `Error downloading session: ${error.message}`);
+        printLog('error', `Error refreshing session: ${error.message}`);
+        // Fall back to existing session if available
+        if (hasValidSession()) {
+            printLog('warning', 'Using existing session (refresh failed)');
+            return true;
+        }
         return false;
     }
 }
@@ -670,6 +642,10 @@ async function startQasimDev() {
                     console.log(chalk.bold.redBright(`⚠️  SESSION CONFLICT (Status 440)`));
                     console.log(chalk.red(`   Another instance is already using this session.`));
                     console.log(chalk.red(`   Please stop other running bots (Local, Koyeb, etc).`));
+                    console.log(chalk.red(`   Waiting 30 seconds before reconnect attempt...`));
+                    // For 440 errors, wait much longer and exit aggressively
+                    await delay(30000);
+                    process.exit(1); // Force restart to clear socket state
                 } else if (reason === 401) { // Logged out
                     console.log(chalk.redBright(`⚠️  Session Logged Out. Please re-pair.`));
                 }
@@ -740,9 +716,11 @@ async function startQasimDev() {
                     }
                 }
 
-                if (shouldReconnect) {
-                    printLog('connection', 'Reconnecting in 5 seconds...');
-                    await delay(5000);
+                // For non-440 errors, use exponential backoff
+                if (shouldReconnect && statusCode !== 440) {
+                    const waitTime = 8000; // Wait 8 seconds for other errors
+                    printLog('connection', `Reconnecting in ${waitTime/1000} seconds...`);
+                    await delay(waitTime);
                     startQasimDev();
                 }
             }

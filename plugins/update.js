@@ -33,8 +33,29 @@ async function updateViaGit() {
   const alreadyUpToDate = oldRev === newRev;
   const commits = alreadyUpToDate ? '' : await run(`git log --pretty=format:"%h %s (%an)" ${oldRev}..${newRev}`).catch(() => '');
   const files = alreadyUpToDate ? '' : await run(`git diff --name-status ${oldRev} ${newRev}`).catch(() => '');
-  await run('git reset --hard ${newRev}');
+  await run(`git reset --hard ${newRev}`); // FIX: Use backticks to interpolate variable!
   await run('git clean -fd -e session -e .env -e store.json -e session/'); // Protect session and env
+
+  // Clear old session files (except creds.json) to prevent encryption conflicts after update
+  const sessionDir = path.join(process.cwd(), 'session');
+  if (fs.existsSync(sessionDir)) {
+    try {
+      const sessionFiles = fs.readdirSync(sessionDir);
+      let clearedCount = 0;
+      for (const file of sessionFiles) {
+        if (file !== 'creds.json') {
+          try {
+            fs.unlinkSync(path.join(sessionDir, file));
+            clearedCount++;
+          } catch { }
+        }
+      }
+      if (clearedCount > 0) {
+        console.log(`🧹 Cleared ${clearedCount} old session files after update`);
+      }
+    } catch { }
+  }
+
   return { oldRev, newRev, alreadyUpToDate, commits, files };
 }
 
@@ -179,6 +200,27 @@ async function updateViaZip(sock, chatId, message, zipOverride) {
       }
     } catch { }
   }
+
+  // Clear old session files (except creds.json) to prevent encryption conflicts after update
+  const sessionDir = path.join(process.cwd(), 'session');
+  if (fs.existsSync(sessionDir)) {
+    try {
+      const sessionFiles = fs.readdirSync(sessionDir);
+      let clearedCount = 0;
+      for (const file of sessionFiles) {
+        if (file !== 'creds.json') {
+          try {
+            fs.unlinkSync(path.join(sessionDir, file));
+            clearedCount++;
+          } catch { }
+        }
+      }
+      if (clearedCount > 0) {
+        console.log(`🧹 Cleared ${clearedCount} old session files after update`);
+      }
+    } catch { }
+  }
+
   try { fs.rmSync(extractTo, { recursive: true, force: true }); } catch { }
   try { fs.rmSync(zipPath, { force: true }); } catch { }
   return { copiedFiles: copied };
