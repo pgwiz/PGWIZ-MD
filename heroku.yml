@@ -1,6 +1,6 @@
 build:
   docker:
     web: Dockerfile
-    
+
 run:
-  web: npm start
+  web: pm2-runtime start index.js --name mega-md --output /dev/stdout --error /dev/stderr
