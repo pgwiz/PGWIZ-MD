@@ -59,7 +59,7 @@ The following downloaders were audited and flagged as currently non-functional d
 * **`.song` / `.mp3`**: Powered by `https://ytsp-api.pgwiz.cloud` (Dual playable audio + MP3 document).
 * **`.play` / `.music`**: Instant YouTube audio player via `https://ytsp-api.pgwiz.cloud`.
 * **`.video` / `.ytmp4`**: High-speed YouTube video downloader (360p & 720p HD).
-* **`.tiktok` / `.tt`**: Multi-API HD TikTok downloader (No Watermark, Photo Slideshows, MP3 sound).
+* **`.tiktok` / `.tt`**: Multi-Engine HD TikTok downloader (`TikWM` + `SaveTik.co` + `MusicalDown` scrapers with canonical unshortener, No Watermark, Photo Slideshows, and MP3 audio extraction).
 * **`.mediafire`**: Direct Cheerio HTML stream parser.
 * **`.gitclone` / `.gitclone2`**: Official GitHub Repository zipball downloader.
 * **`.facebook` / `.fb`**: `gtech-api-xtp1.onrender.com` video extractor.
@@ -77,6 +77,6 @@ The following downloaders were audited and flagged as currently non-functional d
 ### 👁️ WhatsApp Multi-Device Auto Status View & Reaction Architecture:
 * **Status Views**: WhatsApp Multi-Device has no separate "view" API. Sending an explicit `type: 'read'` receipt (`sock.sendReceipt('status@broadcast', normParticipant, [key.id], 'read')` alongside `sock.readMessages([msg.key])`) is what adds the bot to the author's viewer list.
 * **Never Send `read-self`**: `read-self` tells WhatsApp servers to keep the read private to the user's companion devices and explicitly suppresses notifying the status author.
-* **Status Reaction**: Multi-Device status reactions require `relayMessage('status@broadcast', { reactionMessage: { key: { remoteJid: 'status@broadcast', id, participant: normParticipant, fromMe: false }, text: emoji } }, { messageId: id, statusJidList: [normParticipant] })`.
-* **Important**: `statusJidList` must ONLY contain valid user JIDs (`[normParticipant]`), NEVER `'status@broadcast'` which corrupts Signal encryption.
+* **Status Reaction**: Multi-Device status reactions require `sock.sendMessage('status@broadcast', { react: { text: emoji, key: reactionKey } }, { statusJidList })` alongside `sock.relayMessage(...)`.
+* **LID (Linked Identity) & Phone Number Support**: `reactionKey.participant` must preserve the raw author JID (especially `@lid` accounts), and `statusJidList` must include both raw and normalized participant JIDs (excluding `'status@broadcast'`).
 * **Privacy Prerequisite**: The status author MUST have the bot's phone number saved in their contacts, otherwise WhatsApp servers never fan out the status stanza to the bot.
