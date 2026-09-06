@@ -1,6 +1,8 @@
 const axios = require('axios');
+const cheerio = require('cheerio');
 
 const AXIOS_TIMEOUT = 60000;
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 function isValidTikTokUrl(url) {
   if (!url) return false;
@@ -12,28 +14,45 @@ function cleanTikTokUrl(text) {
   return match ? match[0] : null;
 }
 
-async function fetchTikTokData(url) {
-  let lastError;
+async function resolveCanonicalUrl(url) {
+  try {
+    if (/vm\.tiktok\.com|vt\.tiktok\.com|\/t\//i.test(url)) {
+      const res = await axios.get(url, {
+        maxRedirects: 5,
+        timeout: 10000,
+        headers: { 'User-Agent': USER_AGENT }
+      });
+      const finalUrl = res.request?.res?.responseUrl || res.config?.url || url;
+      return finalUrl.split('?')[0];
+    }
+  } catch (e) {
+    if (e.response?.headers?.location) {
+      return e.response.headers.location.split('?')[0];
+    }
+  }
+  return url;
+}
 
-  // 1. Primary: TikWM GET API
+async function fetchTikTokData(rawUrl) {
+  const url = await resolveCanonicalUrl(rawUrl);
+  let errors = [];
+
+  // 1. Primary Engine: TikWM API (HD No Watermark + MP3 + Photos)
   try {
     const res = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`, {
-      timeout: 20000,
+      timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': USER_AGENT,
+        'Accept': 'application/json, text/plain, */*'
       }
     });
 
-    if (res.data && res.data.data) {
+    if (res.data?.code === 0 && res.data.data) {
       const d = res.data.data;
       let videoUrl = d.hdplay || d.play || d.wmplay;
-      if (videoUrl && !videoUrl.startsWith('http')) {
-        videoUrl = 'https://www.tikwm.com' + videoUrl;
-      }
+      if (videoUrl && !videoUrl.startsWith('http')) videoUrl = 'https://www.tikwm.com' + videoUrl;
       let musicUrl = d.music;
-      if (musicUrl && !musicUrl.startsWith('http')) {
-        musicUrl = 'https://www.tikwm.com' + musicUrl;
-      }
+      if (musicUrl && !musicUrl.startsWith('http')) musicUrl = 'https://www.tikwm.com' + musicUrl;
 
       return {
         title: d.title || 'TikTok Video',
@@ -41,95 +60,156 @@ async function fetchTikTokData(url) {
         username: d.author?.unique_id || '',
         avatar: d.author?.avatar,
         duration: d.duration ? `${d.duration}s` : 'N/A',
-        likes: d.digg_count || d.stats?.likes || 0,
-        comments: d.comment_count || d.stats?.comment || 0,
-        shares: d.share_count || d.stats?.share || 0,
-        views: d.play_count || d.stats?.views || 0,
-        sound: d.music_info?.title || d.music || 'Original Sound',
-        videoUrl: videoUrl,
-        musicUrl: musicUrl,
-        images: Array.isArray(d.images) ? d.images : null,
-        isHD: Boolean(d.hdplay)
-      };
-    }
-  } catch (e1) {
-    lastError = e1;
-  }
-
-  // 2. Secondary: TikWM POST API
-  try {
-    const res = await axios.post('https://www.tikwm.com/api/', new URLSearchParams({
-      url: url,
-      count: 12,
-      cursor: 0,
-      web: 1,
-      hd: 1
-    }), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'User-Agent': 'Mozilla/5.0'
-      },
-      timeout: 20000
-    });
-
-    if (res.data && res.data.data) {
-      const d = res.data.data;
-      let videoUrl = d.hdplay || d.play || d.wmplay;
-      if (videoUrl && !videoUrl.startsWith('http')) {
-        videoUrl = 'https://www.tikwm.com' + videoUrl;
-      }
-
-      return {
-        title: d.title || 'TikTok Video',
-        author: d.author?.nickname || d.author?.unique_id || 'TikTok User',
-        username: d.author?.unique_id || '',
-        duration: d.duration ? `${d.duration}s` : 'N/A',
         likes: d.digg_count || 0,
         comments: d.comment_count || 0,
         shares: d.share_count || 0,
         views: d.play_count || 0,
-        sound: d.music_info?.title || 'Original Sound',
+        sound: d.music_info?.title || d.music || 'Original Sound',
         videoUrl: videoUrl,
-        musicUrl: d.music ? (d.music.startsWith('http') ? d.music : 'https://www.tikwm.com' + d.music) : null,
-        images: Array.isArray(d.images) ? d.images : null,
+        musicUrl: musicUrl,
+        images: Array.isArray(d.images) && d.images.length > 0 ? d.images : null,
         isHD: Boolean(d.hdplay)
       };
     }
-  } catch (e2) {
-    lastError = e2;
+  } catch (e1) {
+    errors.push(`TikWM: ${e1.message}`);
   }
 
-  // 3. Fallback: Tiklydown API
+  // 2. Secondary Engine: SaveTik.co API
   try {
-    const res = await axios.get(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(url)}`, {
-      timeout: 20000
+    const res = await axios.post('https://savetik.co/api/ajaxSearch', new URLSearchParams({ q: url, lang: 'en' }), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'User-Agent': USER_AGENT,
+        'Referer': 'https://savetik.co/en'
+      },
+      timeout: 15000
     });
-    if (res.data) {
-      const d = res.data;
-      const video = d.video?.noWatermark || d.video?.watermark;
-      if (video) {
+
+    if (res.data && res.data.data) {
+      const $ = cheerio.load(res.data.data);
+      const title = $('.thumbnail h3').text().trim() || $('h3').text().trim() || 'TikTok Video';
+      const author = $('.thumbnail p').text().trim() || 'TikTok Creator';
+      let videoUrl = null;
+      let hdVideoUrl = null;
+      let musicUrl = null;
+      let images = [];
+
+      $('a').each((_, el) => {
+        const href = $(el).attr('href');
+        const text = $(el).text().toLowerCase();
+        if (href && href.startsWith('http')) {
+          if (text.includes('mp4 hd') || text.includes('hd')) {
+            hdVideoUrl = href;
+          } else if (text.includes('mp4') || text.includes('download')) {
+            if (!videoUrl) videoUrl = href;
+          } else if (text.includes('mp3') || text.includes('audio')) {
+            musicUrl = href;
+          }
+        }
+      });
+
+      $('.photo-list img').each((_, el) => {
+        const src = $(el).attr('src') || $(el).attr('data-src');
+        if (src) images.push(src);
+      });
+
+      const finalVideo = hdVideoUrl || videoUrl;
+      if (finalVideo || images.length > 0) {
         return {
-          title: d.title || 'TikTok Video',
-          author: d.author?.name || 'TikTok User',
-          username: d.author?.unique_id || '',
+          title: title,
+          author: author,
+          username: author.replace(/[^a-zA-Z0-9._]/g, ''),
+          avatar: null,
           duration: 'N/A',
-          likes: d.stats?.likeCount || 0,
-          comments: d.stats?.commentCount || 0,
-          shares: d.stats?.shareCount || 0,
-          views: d.stats?.playCount || 0,
-          sound: d.music?.title || 'Original Sound',
-          videoUrl: video,
-          musicUrl: d.music?.play_url,
-          images: Array.isArray(d.images) ? d.images.map(img => img.url) : null,
-          isHD: true
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          views: 0,
+          sound: 'Original Sound',
+          videoUrl: finalVideo,
+          musicUrl: musicUrl,
+          images: images.length > 0 ? images : null,
+          isHD: Boolean(hdVideoUrl)
+        };
+      }
+    }
+  } catch (e2) {
+    errors.push(`SaveTik: ${e2.message}`);
+  }
+
+  // 3. Fallback Engine: MusicalDown Scraper
+  try {
+    const sessionRes = await axios.get('https://musicaldown.com/en', {
+      headers: { 'User-Agent': USER_AGENT },
+      timeout: 12000
+    });
+    const $ = cheerio.load(sessionRes.data);
+    const form = {};
+    $('form input').each((_, el) => {
+      const name = $(el).attr('name');
+      const val = $(el).attr('value') || '';
+      if (name) form[name] = val;
+    });
+    const keys = Object.keys(form);
+    if (keys.length >= 2) {
+      const postData = new URLSearchParams();
+      postData.append(keys[0], url);
+      postData.append(keys[1], form[keys[1]]);
+      postData.append('verify', '1');
+
+      const cookies = sessionRes.headers['set-cookie']?.map(c => c.split(';')[0]).join('; ');
+      const postRes = await axios.post('https://musicaldown.com/download', postData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': USER_AGENT,
+          'Cookie': cookies,
+          'Referer': 'https://musicaldown.com/en'
+        },
+        timeout: 15000
+      });
+
+      const $res = cheerio.load(postRes.data);
+      let videoUrl = null;
+      let hdVideoUrl = null;
+      let musicUrl = null;
+
+      $res('a.btn[href]').each((_, el) => {
+        const href = $res(el).attr('href');
+        const text = $res(el).text().toLowerCase();
+        if (href && href.startsWith('http')) {
+          if (text.includes('hd')) hdVideoUrl = href;
+          else if (text.includes('mp4')) {
+            if (!videoUrl) videoUrl = href;
+          } else if (text.includes('mp3')) musicUrl = href;
+        }
+      });
+
+      const finalVideo = hdVideoUrl || videoUrl;
+      if (finalVideo) {
+        return {
+          title: 'TikTok Video',
+          author: 'TikTok Creator',
+          username: '',
+          avatar: null,
+          duration: 'N/A',
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          views: 0,
+          sound: 'Original Sound',
+          videoUrl: finalVideo,
+          musicUrl: musicUrl,
+          images: null,
+          isHD: Boolean(hdVideoUrl)
         };
       }
     }
   } catch (e3) {
-    lastError = e3;
+    errors.push(`MusicalDown: ${e3.message}`);
   }
 
-  throw new Error(`Failed to extract TikTok media: ${lastError?.message || 'Server error'}`);
+  throw new Error(`Failed to extract TikTok media from all providers: ${errors.join(' | ')}`);
 }
 
 module.exports = {
