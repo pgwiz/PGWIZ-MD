@@ -606,6 +606,11 @@ async function startPgwizDev() {
         pgwizSocket.ev.on('creds.update', saveCreds);
         store.bind(pgwizSocket.ev);
 
+        const processedMessageKeys = new Set();
+        setInterval(() => {
+            if (processedMessageKeys.size > 5000) processedMessageKeys.clear();
+        }, 60000);
+
         pgwizSocket.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 // Only process real-time messages, ignore history/append
@@ -622,7 +627,11 @@ async function startPgwizDev() {
                 if (normalMessages.length === 0) return;
 
                 const mek = normalMessages[0];
-                if (!mek?.message) return;
+                if (!mek?.message || !mek.key?.id) return;
+
+                const msgDedupeKey = `${mek.key.remoteJid || ''}_${mek.key.id}_${mek.key.fromMe ? '1' : '0'}`;
+                if (processedMessageKeys.has(msgDedupeKey)) return;
+                processedMessageKeys.add(msgDedupeKey);
 
                 mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage')
                     ? mek.message.ephemeralMessage.message
