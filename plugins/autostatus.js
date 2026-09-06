@@ -11,10 +11,29 @@ const HAS_DB = !!(MONGO_URL || POSTGRES_URL || MYSQL_URL || SQLITE_URL);
 
 const configPath = path.join(__dirname, '../data/autoStatus.json');
 
+const STRATEGY_DESCRIPTIONS = {
+    1: 'Classic Relay to Broadcast (with status messageId)',
+    2: 'Fresh Message ID Relay to Broadcast (multi-device JID list)',
+    3: 'Direct Author 1:1 Relay (relayMessage to participant directly)',
+    4: 'Direct Author Native React (sendMessage to participant directly)',
+    5: 'Normalized Phone Broadcast (relayMessage with clean @s.whatsapp.net)',
+    6: 'Native Broadcast React (sendMessage to status@broadcast with statusJidList)'
+};
+
+const STRATEGY_DEFAULT_EMOJIS = {
+    1: '❤️',
+    2: '🔥',
+    3: '🌟',
+    4: '👏',
+    5: '💚',
+    6: '⚡'
+};
+
 const DEFAULTS = {
     view: true,
     react: true,
     reaction: '💚',
+    strategy: 1,
     emojis: ['❤️', '🔥', '✨', '💯', '🌟', '⚡', '😍', '👏', '💖', '🥰', '👍', '🎉']
 };
 
@@ -51,9 +70,11 @@ async function readConfig() {
     try {
         const envViewRaw = process.env.AUTO_STATUS_VIEW ?? process.env.AUTO_STATUS_READ ?? process.env.AUTO_READ_STATUS;
         const envReactRaw = process.env.AUTO_STATUS_REACT ?? process.env.AUTO_REACT_STATUS;
+        const envStrategyRaw = process.env.AUTO_STATUS_STRATEGY;
 
         const hasEnvView = envViewRaw !== undefined && String(envViewRaw).trim() !== '';
         const hasEnvReact = envReactRaw !== undefined && String(envReactRaw).trim() !== '';
+        const hasEnvStrategy = envStrategyRaw !== undefined && !isNaN(parseInt(envStrategyRaw, 10));
 
         if (HAS_DB) {
             const config = await store.getSetting('global', 'autoStatus');
@@ -62,6 +83,7 @@ async function readConfig() {
                 view: hasEnvView ? parseEnvBool(envViewRaw, true) : (data.view !== undefined ? parseEnvBool(data.view, true) : (data.enabled !== undefined ? parseEnvBool(data.enabled, true) : true)),
                 react: hasEnvReact ? parseEnvBool(envReactRaw, true) : (data.react !== undefined ? parseEnvBool(data.react, true) : (data.reactOn !== undefined ? parseEnvBool(data.reactOn, true) : true)),
                 reaction: data.reaction || '💚',
+                strategy: hasEnvStrategy ? parseInt(envStrategyRaw, 10) : (Number(data.strategy) || 1),
                 emojis: data.emojis || DEFAULTS.emojis
             };
         } else {
@@ -71,6 +93,7 @@ async function readConfig() {
                 view: hasEnvView ? parseEnvBool(envViewRaw, true) : (data.view !== undefined ? parseEnvBool(data.view, true) : (data.enabled !== undefined ? parseEnvBool(data.enabled, true) : true)),
                 react: hasEnvReact ? parseEnvBool(envReactRaw, true) : (data.react !== undefined ? parseEnvBool(data.react, true) : (data.reactOn !== undefined ? parseEnvBool(data.reactOn, true) : true)),
                 reaction: data.reaction || '💚',
+                strategy: hasEnvStrategy ? parseInt(envStrategyRaw, 10) : (Number(data.strategy) || 1),
                 emojis: data.emojis || DEFAULTS.emojis
             };
         }
@@ -83,6 +106,7 @@ async function writeConfig(config) {
     try {
         if (config.view !== undefined) process.env.AUTO_STATUS_VIEW = String(config.view);
         if (config.react !== undefined) process.env.AUTO_STATUS_REACT = String(config.react);
+        if (config.strategy !== undefined) process.env.AUTO_STATUS_STRATEGY = String(config.strategy);
 
         if (HAS_DB) {
             await store.saveSetting('global', 'autoStatus', config);
@@ -138,45 +162,122 @@ function cacheRecentStatus(key) {
     }
 }
 
-async function reactToStatus(sock, statusKey, customEmoji = null) {
+/**
+ * Execute a specific Baileys status reaction strategy
+ */
+async function executeReactionStrategy(sock, strategyNum, statusKey, emoji) {
+    const rawParticipant = statusKey.participant || statusKey.remoteJid;
+    if (!rawParticipant || rawParticipant === 'status@broadcast') {
+        throw new Error('Invalid status participant');
+    }
+
+    const cleanNum = rawParticipant.replace(/[^0-9]/g, '');
+    const phoneJid = cleanNum ? (cleanNum + '@s.whatsapp.net') : rawParticipant;
+    const normParticipant = rawParticipant.includes('@')
+        ? (rawParticipant.split(':')[0] + (rawParticipant.includes('@lid') ? '@lid' : '@s.whatsapp.net'))
+        : rawParticipant;
+
+    const reactionKey = {
+        remoteJid: 'status@broadcast',
+        id: statusKey.id,
+        participant: rawParticipant,
+        fromMe: false
+    };
+
+    switch (Number(strategyNum)) {
+        case 1: {
+            // Strategy 1: Classic Upstream Relay to status@broadcast
+            const statusJidList = [rawParticipant].filter(j => j && j !== 'status@broadcast');
+            return await sock.relayMessage('status@broadcast', {
+                reactionMessage: {
+                    key: reactionKey,
+                    text: emoji
+                }
+            }, {
+                messageId: statusKey.id,
+                statusJidList: statusJidList.length > 0 ? statusJidList : [rawParticipant]
+            });
+        }
+        case 2: {
+            // Strategy 2: Fresh generated Message ID Relay to status@broadcast with multi-device list
+            const statusJidList = Array.from(new Set([rawParticipant, phoneJid, normParticipant])).filter(j => j && j !== 'status@broadcast');
+            return await sock.relayMessage('status@broadcast', {
+                reactionMessage: {
+                    key: reactionKey,
+                    text: emoji
+                }
+            }, {
+                statusJidList
+            });
+        }
+        case 3: {
+            // Strategy 3: Direct Author 1:1 Relay (send reactionMessage stanza directly to the user's DM session)
+            return await sock.relayMessage(rawParticipant, {
+                reactionMessage: {
+                    key: reactionKey,
+                    text: emoji
+                }
+            }, {});
+        }
+        case 4: {
+            // Strategy 4: Direct Author Native React (sock.sendMessage to author with status key)
+            return await sock.sendMessage(rawParticipant, {
+                react: {
+                    text: emoji,
+                    key: reactionKey
+                }
+            });
+        }
+        case 5: {
+            // Strategy 5: Normalized Phone Broadcast (relayMessage with phone @s.whatsapp.net only)
+            const statusJidList = [phoneJid].filter(j => j && j !== 'status@broadcast');
+            return await sock.relayMessage('status@broadcast', {
+                reactionMessage: {
+                    key: {
+                        remoteJid: 'status@broadcast',
+                        id: statusKey.id,
+                        participant: phoneJid,
+                        fromMe: false
+                    },
+                    text: emoji
+                }
+            }, {
+                messageId: statusKey.id,
+                statusJidList
+            });
+        }
+        case 6: {
+            // Strategy 6: Native Broadcast React (sock.sendMessage to status@broadcast with statusJidList)
+            const statusJidList = Array.from(new Set([rawParticipant, phoneJid])).filter(j => j && j !== 'status@broadcast');
+            return await sock.sendMessage('status@broadcast', {
+                react: {
+                    text: emoji,
+                    key: reactionKey
+                }
+            }, {
+                statusJidList
+            });
+        }
+        default:
+            throw new Error(`Unknown strategy: ${strategyNum}`);
+    }
+}
+
+async function reactToStatus(sock, statusKey, customEmoji = null, customStrategy = null) {
     try {
         if (!sock || !statusKey?.id) return false;
         const enabled = customEmoji ? true : await isStatusReactionEnabled();
         if (!enabled) return false;
 
-        const rawParticipant = statusKey.participant || statusKey.remoteJid;
-        if (!rawParticipant || rawParticipant === 'status@broadcast') return false;
-
         const cfg = await readConfig();
         const emoji = customEmoji || getStatusEmoji(cfg);
+        const strat = Number(customStrategy) || Number(cfg.strategy) || 1;
 
-        const reactionKey = {
-            remoteJid: 'status@broadcast',
-            id: statusKey.id,
-            participant: rawParticipant,
-            fromMe: false
-        };
-
-        const statusJidList = Array.from(new Set([
-            statusKey.remoteJid,
-            rawParticipant
-        ])).filter(j => j && j !== 'status@broadcast');
-
-        // Relay reaction stanza to status@broadcast
-        await sock.relayMessage('status@broadcast', {
-            reactionMessage: {
-                key: reactionKey,
-                text: emoji
-            }
-        }, {
-            messageId: statusKey.id,
-            statusJidList: statusJidList.length > 0 ? statusJidList : [rawParticipant]
-        });
-
-        console.log(`[AUTOSTATUS] ✅ Reacted to status ${statusKey.id} from ${rawParticipant} with ${emoji}`);
+        await executeReactionStrategy(sock, strat, statusKey, emoji);
+        console.log(`[AUTOSTATUS] ✅ Reacted to status ${statusKey.id} from ${statusKey.participant || 'contact'} with ${emoji} (Strategy ${strat})`);
         return true;
     } catch (error) {
-        console.error('[AUTOSTATUS] ❌ Error reacting to status:', error.message);
+        console.error(`[AUTOSTATUS] ❌ Error reacting to status (Strategy ${customStrategy || 'default'}):`, error.message);
         return false;
     }
 }
@@ -225,7 +326,7 @@ async function handleStatusUpdate(sock, status) {
                 }
             }
 
-            // 2. React to status
+            // 2. React to status using configured strategy
             if (config.react) {
                 await reactToStatus(sock, key);
             }
@@ -240,7 +341,7 @@ module.exports = {
     aliases: ['astatus', 'asv', 'autoview', 'statusview'],
     category: 'owner',
     description: 'Auto view and react to status updates (owner only)',
-    usage: '.autostatus [view on/off] [react on/off] [reaction <emoji>] [readreceipts on/off]',
+    usage: '.autostatus [view on/off] [react on/off] [strategy <1-6>] [reaction <emoji>] [readreceipts on/off]',
     ownerOnly: true,
 
     async handler(sock, message, args, context = {}) {
@@ -248,6 +349,7 @@ module.exports = {
         try {
             const cfg = await readConfig();
             const ignoreList = (HAS_DB ? await store.getSetting('global', 'autoStatusIgnoreList') : []) || [];
+            const activeStrategyName = STRATEGY_DESCRIPTIONS[cfg.strategy] || STRATEGY_DESCRIPTIONS[1];
 
             if (!args || args.length === 0) {
                 let privacyNote = '';
@@ -264,18 +366,24 @@ module.exports = {
                         `👁️ *Auto View:* *${cfg.view ? 'ON' : 'OFF'}* (Views status updates immediately)\n` +
                         `💫 *Auto React:* *${cfg.react ? 'ON' : 'OFF'}* (Reacts to status updates)\n` +
                         `✨ *Reaction Emoji:* ${cfg.reaction}\n` +
+                        `⚙️ *Reaction Strategy:* *Strategy ${cfg.strategy}* (${activeStrategyName})\n` +
                         `🗄️ *Storage:* ${HAS_DB ? 'Database' : 'File System'}\n` +
                         `🚫 *Ignored Contacts:* ${ignoreList.length}` +
                         privacyNote + `\n\n` +
                         `*Commands:*\n` +
                         `• \`.autostatus view on/off\` - Toggle status viewing\n` +
                         `• \`.autostatus react on/off\` - Toggle status reaction\n` +
+                        `• \`.autostatus strategy <1-6>\` - Set reaction strategy (1 to 6)\n` +
                         `• \`.autostatus reaction <emoji>\` - Set status reaction emoji\n` +
                         `• \`.autostatus readreceipts on/off\` - Toggle WhatsApp read receipts privacy\n` +
                         `• \`.autostatus on/off\` - Global toggle\n` +
                         `• \`.autostatus ignore <number>\` - Exclude contact\n` +
                         `• \`.autostatus unignore <number>\` - Remove contact\n` +
-                        `• \`.autostatus ignored\` - List excluded contacts`,
+                        `• \`.autostatus ignored\` - List excluded contacts\n\n` +
+                        `*🧪 Diagnostic Probes (Hidden Dev Tools):*\n` +
+                        `• \`.autostatus dev <1-6> [emoji]\` - Test specific reaction strategy on status\n` +
+                        `• \`.autostatus dev all [emoji]\` - Test ALL 6 strategies sequentially\n` +
+                        `• Reply/quote a status with \`.autostatus dev <1-6|all>\``,
                     ...channelInfo
                 }, { quoted: message });
             }
@@ -283,12 +391,11 @@ module.exports = {
             const sub = args[0].toLowerCase();
             const val = args[1]?.toLowerCase();
 
-            // === Hidden Dev Diagnostic Probe Command ===
+            // === Hidden Dev Diagnostic Multi-Strategy Probe Command ===
             if (sub === 'dev' || sub === 'test' || sub === 'debug') {
-                const targetInput = args[1]?.trim();
-                const customEmoji = args[2]?.trim() || (targetInput && !targetInput.match(/^[0-9+@.]/) ? targetInput : null) || cfg.reaction || '💚';
-
                 let targetKey = null;
+                let requestedStrategy = null;
+                let requestedEmoji = null;
 
                 // 1. Check if user quoted a status message
                 let innerMsg = message.message;
@@ -306,23 +413,45 @@ module.exports = {
                     };
                 }
 
-                // 2. If target number or JID provided, look up in recentStatusCache
-                if (!targetKey && targetInput && targetInput.match(/^[0-9+@]/)) {
-                    const cleanNum = targetInput.replace(/[^0-9]/g, '');
-                    const cached = recentStatusCache.get(cleanNum) || recentStatusCache.get(targetInput);
-                    if (cached) {
-                        targetKey = cached;
+                // Parse remaining args for strategy, phone/JID, and emoji
+                const devArgs = args.slice(1);
+                for (const arg of devArgs) {
+                    const cleanArg = arg.trim();
+                    if (!cleanArg) continue;
+
+                    if (cleanArg.toLowerCase() === 'all') {
+                        requestedStrategy = 'all';
+                    } else if (/^[1-6]$/.test(cleanArg)) {
+                        requestedStrategy = parseInt(cleanArg, 10);
+                    } else if (cleanArg.match(/^[0-9+@]/) && cleanArg.length >= 8) {
+                        // Phone number or JID
+                        if (!targetKey) {
+                            const cleanNum = cleanArg.replace(/[^0-9]/g, '');
+                            const cached = recentStatusCache.get(cleanNum) || recentStatusCache.get(cleanArg);
+                            if (cached) {
+                                targetKey = cached;
+                            }
+                        }
+                    } else {
+                        // Emoji or custom text
+                        requestedEmoji = cleanArg;
                     }
                 }
 
                 if (!targetKey) {
                     const cachedCount = recentStatusCache.size;
                     return await sock.sendMessage(chatId, {
-                        text: `🛠️ *AutoStatus Dev Diagnostic Tool*\n\n` +
-                            `*Usage:* Reply to any status message with:\n` +
-                            `• \`.autostatus dev [emoji]\`\n\n` +
-                            (targetInput ? `⚠️ *No active status from \`${targetInput}\` found in cache.* (${cachedCount} statuses in memory)\n` : '') +
-                            `_Please reply to a status message directly to run live diagnostic force-reaction._`,
+                        text: `🛠️ *AutoStatus Dev Diagnostic Suite*\n\n` +
+                            `*How to use:*\n` +
+                            `Reply to any status message with:\n` +
+                            `• \`.autostatus dev 1 [emoji]\` - Test Strategy 1 (${STRATEGY_DESCRIPTIONS[1]})\n` +
+                            `• \`.autostatus dev 2 [emoji]\` - Test Strategy 2 (${STRATEGY_DESCRIPTIONS[2]})\n` +
+                            `• \`.autostatus dev 3 [emoji]\` - Test Strategy 3 (${STRATEGY_DESCRIPTIONS[3]})\n` +
+                            `• \`.autostatus dev 4 [emoji]\` - Test Strategy 4 (${STRATEGY_DESCRIPTIONS[4]})\n` +
+                            `• \`.autostatus dev 5 [emoji]\` - Test Strategy 5 (${STRATEGY_DESCRIPTIONS[5]})\n` +
+                            `• \`.autostatus dev 6 [emoji]\` - Test Strategy 6 (${STRATEGY_DESCRIPTIONS[6]})\n` +
+                            `• \`.autostatus dev all [emoji]\` - Test ALL 6 strategies sequentially\n\n` +
+                            `_Current status memory cache:_ ${cachedCount} active statuses. Please reply/quote a status directly to probe.`,
                         ...channelInfo
                     }, { quoted: message });
                 }
@@ -337,17 +466,27 @@ module.exports = {
                     logs.push(`[+${elapsed}s] ${text}`);
                 };
 
-                log(`Force-reaction probe started for: ${targetParticipant}`);
-                log(`Target Stanza ID: ${targetId}`);
-                log(`Emoji: ${customEmoji}`);
+                const isAll = requestedStrategy === 'all';
+                const strategyToRun = isAll ? 'ALL (1 to 6)' : (requestedStrategy || cfg.strategy || 1);
+                const emojiToUse = requestedEmoji || cfg.reaction || '💚';
 
-                // Send instant ACK
+                log(`Diagnostic probe started for: ${targetParticipant}`);
+                log(`Target Stanza ID: ${targetId}`);
+                log(`Strategy: ${strategyToRun}`);
+
+                // Send instant ACK in current chat
                 await sock.sendMessage(chatId, {
-                    text: `🛠️ *AutoStatus Dev Probe Started*\n\n🎯 *Target:* \`${targetParticipant}\`\n🆔 *Stanza ID:* \`${targetId}\`\n✨ *Emoji:* ${customEmoji}\n⏳ *Window:* 30 seconds monitoring...\n\n_Detailed diagnostic logs will be sent to Owner DM._`,
+                    text: `🛠️ *AutoStatus Dev Probe Started*\n\n` +
+                        `🎯 *Target:* \`${targetParticipant}\`\n` +
+                        `🆔 *Stanza ID:* \`${targetId}\`\n` +
+                        `⚙️ *Strategy:* ${strategyToRun}\n` +
+                        `✨ *Emoji:* ${emojiToUse}\n` +
+                        `⏳ *Window:* 30s observation...\n\n` +
+                        `_Testing reaction stanzas and monitoring live socket events. Report will be delivered to Owner DM._`,
                     ...channelInfo
                 }, { quoted: message });
 
-                // Step 1: Check WhatsApp Read Receipts Privacy
+                // Step 1: Privacy check
                 let privacyState = 'unknown';
                 try {
                     const privacy = await sock.fetchPrivacySettings?.();
@@ -365,13 +504,25 @@ module.exports = {
                     log(`readMessages error: ${ve.message}`);
                 }
 
-                // Step 3: Dispatch Reaction via relayMessage
-                try {
-                    const reactOk = await reactToStatus(sock, targetKey, customEmoji);
-                    log(`relayMessage reaction dispatched: ${reactOk ? 'SUCCESS' : 'FAILED'}`);
-                } catch (re) {
-                    log(`relayMessage error: ${re.message}`);
-                }
+                // Step 3: Dispatch Strategies
+                const strategiesToTest = isAll ? [1, 2, 3, 4, 5, 6] : [Number(strategyToRun)];
+
+                (async () => {
+                    for (let i = 0; i < strategiesToTest.length; i++) {
+                        const sNum = strategiesToTest[i];
+                        const sEmoji = requestedEmoji || STRATEGY_DEFAULT_EMOJIS[sNum] || emojiToUse;
+                        try {
+                            log(`[STRATEGY ${sNum}] Dispatching "${STRATEGY_DESCRIPTIONS[sNum]}" with emoji ${sEmoji}...`);
+                            await executeReactionStrategy(sock, sNum, targetKey, sEmoji);
+                            log(`[STRATEGY ${sNum}] ✅ Dispatched successfully! (Emoji: ${sEmoji})`);
+                        } catch (err) {
+                            log(`[STRATEGY ${sNum}] ❌ Error: ${err.message}`);
+                        }
+                        if (isAll && i < strategiesToTest.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 2500));
+                        }
+                    }
+                })().catch(e => log(`Strategy execution loop error: ${e.message}`));
 
                 // Step 4: Attach 30-Second Event Listener Collector
                 const receiptEvents = [];
@@ -415,23 +566,28 @@ module.exports = {
                         const ownerNum = (Array.isArray(settings.ownerNumber) ? settings.ownerNumber[0] : settings.ownerNumber) || (sock.user?.id ? sock.user.id.split(':')[0] : '');
                         const ownerJid = ownerNum ? (ownerNum.replace(/[^0-9]/g, '') + '@s.whatsapp.net') : chatId;
 
+                        const strategySummary = isAll
+                            ? `ALL 6 Strategies Tested (Emojis: ${Object.values(STRATEGY_DEFAULT_EMOJIS).join(' ')})`
+                            : `Strategy ${strategyToRun} (${STRATEGY_DESCRIPTIONS[strategyToRun]})`;
+
                         const report = `📊 *AutoStatus Dev Diagnostic Report (30s)*\n\n` +
                             `🎯 *Target:* \`${targetParticipant}\`\n` +
                             `🆔 *Stanza ID:* \`${targetId}\`\n` +
-                            `✨ *Reaction Emoji:* ${customEmoji}\n` +
+                            `⚙️ *Tested:* ${strategySummary}\n` +
                             `🔒 *Read Receipts Privacy:* \`${privacyState}\`\n` +
                             `📬 *Receipt Events:* ${receiptEvents.length}\n` +
                             `🔄 *Update Events:* ${updateEvents.length}\n\n` +
-                            `📋 *Diagnostic Log Timeline:*\n\`\`\`\n` +
+                            `📋 *Diagnostic Timeline:*\n\`\`\`\n` +
                             logs.join('\n') +
                             `\n\`\`\`\n\n` +
-                            `> _Generated by MEGA-MD Developer Diagnostics_`;
+                            `💡 *Next Step:* Once you see which emoji appeared on your status, type \`.autostatus strategy <number>\` to lock it in for all automatic reactions!\n\n` +
+                            `> _MEGA-MD Developer Diagnostics_`;
 
                         if (ownerJid && ownerJid !== '@s.whatsapp.net') {
                             await sock.sendMessage(ownerJid, { text: report }).catch(() => {});
                         }
                         if (chatId !== ownerJid) {
-                            await sock.sendMessage(chatId, { text: `✅ *AutoStatus Dev Probe Finished.* Diagnostic report sent to Owner DM.` }).catch(() => {});
+                            await sock.sendMessage(chatId, { text: `✅ *AutoStatus Dev Probe Finished.* Full diagnostic report sent to Owner DM.` }).catch(() => {});
                         }
                     } catch (e) {
                         console.error('[autostatus dev report error]:', e.message);
@@ -439,6 +595,24 @@ module.exports = {
                 }, 30000);
 
                 return;
+            }
+
+            if (sub === 'strategy' || sub === 'strat') {
+                const sNum = parseInt(val, 10);
+                if (!sNum || isNaN(sNum) || sNum < 1 || sNum > 6) {
+                    const list = Object.entries(STRATEGY_DESCRIPTIONS).map(([k, v]) => `• *Strategy ${k}:* ${v}`).join('\n');
+                    return await sock.sendMessage(chatId, {
+                        text: `⚙️ *Available AutoStatus Reaction Strategies:*\n\n${list}\n\n*Usage:* \`.autostatus strategy <1-6>\`\n*Current Strategy:* *Strategy ${cfg.strategy}*`,
+                        ...channelInfo
+                    }, { quoted: message });
+                }
+
+                cfg.strategy = sNum;
+                await writeConfig(cfg);
+                return await sock.sendMessage(chatId, {
+                    text: `✅ *AutoStatus reaction strategy set to Strategy ${sNum}!* \n\n_${STRATEGY_DESCRIPTIONS[sNum]}_\n\nAll automated status reactions will now use this strategy.`,
+                    ...channelInfo
+                }, { quoted: message });
             }
 
             if (sub === 'view') {
@@ -459,7 +633,7 @@ module.exports = {
                 if (val === 'on' || val === 'true' || val === '1') {
                     cfg.react = true;
                     await writeConfig(cfg);
-                    return await sock.sendMessage(chatId, { text: `💫 AutoStatus *react* is ON. Bot will react with ${cfg.reaction}.`, ...channelInfo }, { quoted: message });
+                    return await sock.sendMessage(chatId, { text: `💫 AutoStatus *react* is ON. Bot will react with ${cfg.reaction} using Strategy ${cfg.strategy}.`, ...channelInfo }, { quoted: message });
                 }
                 if (val === 'off' || val === 'false' || val === '0') {
                     cfg.react = false;
@@ -503,7 +677,7 @@ module.exports = {
                 cfg.view = true;
                 cfg.react = true;
                 await writeConfig(cfg);
-                return await sock.sendMessage(chatId, { text: '✅ AutoStatus *view* and *react* enabled!', ...channelInfo }, { quoted: message });
+                return await sock.sendMessage(chatId, { text: `✅ AutoStatus *view* and *react* enabled! (Strategy ${cfg.strategy})`, ...channelInfo }, { quoted: message });
             }
 
             if (sub === 'off' || sub === 'disable') {
@@ -537,7 +711,7 @@ module.exports = {
             }
 
             return await sock.sendMessage(chatId, {
-                text: '❌ Invalid option.\nUse: `.autostatus view on/off` | `.autostatus react on/off` | `.autostatus reaction <emoji>` | `.autostatus readreceipts on/off`',
+                text: '❌ Invalid option.\nUse: `.autostatus view on/off` | `.autostatus react on/off` | `.autostatus strategy <1-6>` | `.autostatus reaction <emoji>` | `.autostatus readreceipts on/off`',
                 ...channelInfo
             }, { quoted: message });
 
@@ -550,7 +724,9 @@ module.exports = {
     handleStatusUpdate,
     isAutoStatusEnabled,
     isStatusReactionEnabled,
+    executeReactionStrategy,
     reactToStatus,
     readConfig,
-    writeConfig
+    writeConfig,
+    STRATEGY_DESCRIPTIONS
 };
