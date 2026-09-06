@@ -1,10 +1,8 @@
-const { downloadMediaMessage, jidNormalizedUser, delay } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
-const settings = require('../settings');
 const store = require('../lib/lightweight_store');
 
-const MONGO_URL = process.env.MONGO_URL || process.env.MONGODB_URI || process.env.MONGO_URI || process.env.MONGODB_URL;
+const MONGO_URL = process.env.MONGO_URL || process.env.MONGODB_URI || process.env.MONGO_URI;
 const POSTGRES_URL = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 const MYSQL_URL = process.env.MYSQL_URL;
 const SQLITE_URL = process.env.DB_URL;
@@ -12,13 +10,29 @@ const HAS_DB = !!(MONGO_URL || POSTGRES_URL || MYSQL_URL || SQLITE_URL);
 
 const configPath = path.join(__dirname, '../data/autoStatus.json');
 
+const DEFAULTS = {
+    view: true,
+    react: true,
+    reaction: '💚',
+    emojis: ['❤️', '🔥', '✨', '💯', '🌟', '⚡', '😍', '👏', '💖', '🥰', '👍', '🎉']
+};
+
+if (!HAS_DB && !fs.existsSync(configPath)) {
+    try {
+        if (!fs.existsSync(path.dirname(configPath))) {
+            fs.mkdirSync(path.dirname(configPath), { recursive: true });
+        }
+        fs.writeFileSync(configPath, JSON.stringify(DEFAULTS, null, 2));
+    } catch {}
+}
+
 const channelInfo = {
     contextInfo: {
         forwardingScore: 1,
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
-            newsletterJid: settings.newsletterJid || '120363179639202475@newsletter',
-            newsletterName: settings.newsletterName || settings.botName || 'PGWIZ-MD',
+            newsletterJid: '120363319098372999@newsletter',
+            newsletterName: 'GlobalTechInc',
             serverMessageId: -1
         }
     }
@@ -32,70 +46,42 @@ function parseEnvBool(val, fallback = true) {
     return fallback;
 }
 
-// Hardcoded default status reaction emojis
-const DEFAULT_STATUS_EMOJIS = ['❤️', '🔥', '✨', '💯', '🌟', '⚡', '😍', '👏', '💖', '🥰', '👍', '🎉'];
-
-function getStatusEmojis() {
-    const envEmojis = process.env.STATUS_EMOJIS || process.env.AUTO_STATUS_EMOJIS || process.env.STATUS_REACTION_EMOJIS;
-    if (envEmojis && typeof envEmojis === 'string' && envEmojis.trim() !== '') {
-        const parsed = envEmojis.split(',').map(e => e.trim()).filter(Boolean);
-        if (parsed.length > 0) return parsed;
-    }
-    return DEFAULT_STATUS_EMOJIS;
-}
-
-function getRandomStatusEmoji() {
-    const emojis = getStatusEmojis();
-    if (!Array.isArray(emojis) || emojis.length === 0) return '❤️';
-    return emojis[Math.floor(Math.random() * emojis.length)] || '❤️';
-}
-
 async function readConfig() {
     try {
-        const envViewRaw = process.env.AUTO_STATUS_VIEW ?? process.env.AUTO_STATUS_READ ?? process.env.AUTO_READ_STATUS ?? process.env.STATUS_VIEW ?? process.env.AUTO_VIEW_STATUS;
-        const envReactRaw = process.env.AUTO_STATUS_REACT ?? process.env.AUTO_REACT_STATUS ?? process.env.STATUS_REACT ?? process.env.AUTO_REACT ?? process.env.STATUS_REACTION;
+        const envViewRaw = process.env.AUTO_STATUS_VIEW ?? process.env.AUTO_STATUS_READ ?? process.env.AUTO_READ_STATUS;
+        const envReactRaw = process.env.AUTO_STATUS_REACT ?? process.env.AUTO_REACT_STATUS;
 
         const hasEnvView = envViewRaw !== undefined && String(envViewRaw).trim() !== '';
         const hasEnvReact = envReactRaw !== undefined && String(envReactRaw).trim() !== '';
 
-        const envEnabled = parseEnvBool(envViewRaw, true);
-        const envReactOn = parseEnvBool(envReactRaw, true);
-
         if (HAS_DB) {
             const config = await store.getSetting('global', 'autoStatus');
+            const data = config || DEFAULTS;
             return {
-                enabled: hasEnvView ? envEnabled : (config?.enabled !== undefined ? parseEnvBool(config.enabled, true) : true),
-                reactOn: hasEnvReact ? envReactOn : (config?.reactOn !== undefined ? parseEnvBool(config.reactOn, true) : true)
+                view: hasEnvView ? parseEnvBool(envViewRaw, true) : (data.view !== undefined ? parseEnvBool(data.view, true) : (data.enabled !== undefined ? parseEnvBool(data.enabled, true) : true)),
+                react: hasEnvReact ? parseEnvBool(envReactRaw, true) : (data.react !== undefined ? parseEnvBool(data.react, true) : (data.reactOn !== undefined ? parseEnvBool(data.reactOn, true) : true)),
+                reaction: data.reaction || '💚',
+                emojis: data.emojis || DEFAULTS.emojis
             };
         } else {
-            if (!fs.existsSync(configPath)) {
-                const initialConfig = { enabled: envEnabled, reactOn: envReactOn };
-                try {
-                    if (!fs.existsSync(path.dirname(configPath))) fs.mkdirSync(path.dirname(configPath), { recursive: true });
-                    fs.writeFileSync(configPath, JSON.stringify(initialConfig, null, 2));
-                } catch {}
-                return initialConfig;
-            }
-
-            try {
-                const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-                return {
-                    enabled: hasEnvView ? envEnabled : (config?.enabled !== undefined ? parseEnvBool(config.enabled, true) : envEnabled),
-                    reactOn: hasEnvReact ? envReactOn : (config?.reactOn !== undefined ? parseEnvBool(config.reactOn, true) : envReactOn)
-                };
-            } catch {
-                return { enabled: envEnabled, reactOn: envReactOn };
-            }
+            if (!fs.existsSync(configPath)) return { ...DEFAULTS };
+            const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            return {
+                view: hasEnvView ? parseEnvBool(envViewRaw, true) : (data.view !== undefined ? parseEnvBool(data.view, true) : (data.enabled !== undefined ? parseEnvBool(data.enabled, true) : true)),
+                react: hasEnvReact ? parseEnvBool(envReactRaw, true) : (data.react !== undefined ? parseEnvBool(data.react, true) : (data.reactOn !== undefined ? parseEnvBool(data.reactOn, true) : true)),
+                reaction: data.reaction || '💚',
+                emojis: data.emojis || DEFAULTS.emojis
+            };
         }
-    } catch (error) {
-        return { enabled: true, reactOn: true };
+    } catch (e) {
+        return { ...DEFAULTS };
     }
 }
 
 async function writeConfig(config) {
     try {
-        if (config.enabled !== undefined) process.env.AUTO_STATUS_VIEW = String(config.enabled);
-        if (config.reactOn !== undefined) process.env.AUTO_STATUS_REACT = String(config.reactOn);
+        if (config.view !== undefined) process.env.AUTO_STATUS_VIEW = String(config.view);
+        if (config.react !== undefined) process.env.AUTO_STATUS_REACT = String(config.react);
 
         if (HAS_DB) {
             await store.saveSetting('global', 'autoStatus', config);
@@ -105,117 +91,48 @@ async function writeConfig(config) {
             }
             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
         }
-
-        // Update local .env
-        try {
-            const envPath = path.join(__dirname, '../.env');
-            if (fs.existsSync(envPath)) {
-                let content = fs.readFileSync(envPath, 'utf8');
-                if (config.enabled !== undefined) content = upsertEnvKey(content, 'AUTO_STATUS_VIEW', String(config.enabled));
-                if (config.reactOn !== undefined) content = upsertEnvKey(content, 'AUTO_STATUS_REACT', String(config.reactOn));
-                fs.writeFileSync(envPath, content);
-            }
-        } catch {}
-
-        // Cloud sync to Heroku & Koyeb
-        syncToCloudPlatforms({
-            AUTO_STATUS_VIEW: String(config.enabled),
-            AUTO_STATUS_REACT: String(config.reactOn)
-        }).catch(() => {});
-
         return true;
-    } catch (error) {
-        console.error('Error writing auto status config:', error);
+    } catch (e) {
+        console.error('[autostatus] Error writing config:', e.message);
         return false;
     }
 }
 
-function upsertEnvKey(content, key, value) {
-    const lines = content.split('\n');
-    let found = false;
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim().startsWith(key + '=')) {
-            lines[i] = key + '=' + value;
-            found = true;
-            break;
-        }
-    }
-    if (!found) lines.push(key + '=' + value);
-    return lines.join('\n');
-}
-
-async function syncToCloudPlatforms(varsToSync) {
-    try {
-        const pgvars = require('./pgvars');
-        if (pgvars && typeof pgvars.syncCloudVars === 'function') {
-            await pgvars.syncCloudVars(varsToSync);
-        }
-    } catch {}
-}
-
 async function isAutoStatusEnabled() {
-    const config = await readConfig();
-    return config.enabled !== false;
+    const cfg = await readConfig();
+    return cfg.view !== false;
 }
 
 async function isStatusReactionEnabled() {
-    const config = await readConfig();
-    return config.reactOn !== false;
+    const cfg = await readConfig();
+    return cfg.react !== false;
 }
 
-async function handleAutoDownloadStatus(sock, msg) {
-    try {
-        const isSaveEnabled = await store.getSetting('global', 'autoStatusSave');
-        const envSave = process.env.AUTO_STATUS_SAVE || process.env.AUTO_STATUS_DOWNLOAD;
-        const enabled = (isSaveEnabled !== undefined && isSaveEnabled !== null) ? Boolean(isSaveEnabled) : (String(envSave).toLowerCase() === 'true');
-        if (!enabled) return;
-
-        const ownerNum = settings.ownerNumber || (sock.user?.id ? sock.user.id.split(':')[0] : null);
-        if (!ownerNum) return;
-        const ownerJid = (Array.isArray(ownerNum) ? ownerNum[0] : ownerNum).replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-
-        const sender = (msg.key?.participant || '').split('@')[0];
-        const captionPrefix = `📥 *[AUTO-STATUS DOWNLOAD]*\n👤 *From:* +${sender}\n\n`;
-
-        const m = msg.message;
-        const type = Object.keys(m || {})[0];
-        if (!type) return;
-
-        if (type === 'conversation' || type === 'extendedTextMessage') {
-            const text = m.conversation || m.extendedTextMessage?.text || '';
-            await sock.sendMessage(ownerJid, { text: `${captionPrefix}${text}` });
-        } else if (type === 'imageMessage' || type === 'videoMessage') {
-            const stream = await downloadMediaMessage(msg, 'buffer', {});
-            if (type === 'imageMessage') {
-                await sock.sendMessage(ownerJid, { image: stream, caption: `${captionPrefix}${m.imageMessage?.caption || ''}` });
-            } else {
-                await sock.sendMessage(ownerJid, { video: stream, caption: `${captionPrefix}${m.videoMessage?.caption || ''}` });
-            }
-        }
-    } catch (e) {
-        console.error('[AUTOSTATUS] Auto-download error:', e.message);
-    }
+function getStatusEmoji(cfg) {
+    const envEmoji = process.env.STATUS_REACTION || process.env.STATUS_EMOJI;
+    if (envEmoji && envEmoji.trim() !== '') return envEmoji.trim();
+    return cfg.reaction || '💚';
 }
 
-// Track reacted statuses to prevent duplicates & infinite loops
-const reactedStatuses = new Set();
-setInterval(() => reactedStatuses.clear(), 2 * 60 * 60 * 1000);
+// Track reacted statuses to prevent duplicate reaction stanzas
+const reactedStatusKeys = new Set();
+setInterval(() => {
+    if (reactedStatusKeys.size > 2000) reactedStatusKeys.clear();
+}, 60000);
 
-// Proven Relay Status Reaction Engine (Multi-Device LID & PN compliant)
-async function reactToStatus(sock, statusKey) {
+async function reactToStatus(sock, statusKey, customEmoji = null) {
     try {
         if (!sock || !statusKey?.id) return;
         const enabled = await isStatusReactionEnabled();
         if (!enabled) return;
 
-        const rawParticipant = statusKey.rawParticipant || statusKey.participant || statusKey.remoteJid;
+        const rawParticipant = statusKey.participant || statusKey.remoteJid;
         if (!rawParticipant || rawParticipant === 'status@broadcast') return;
 
-        const normParticipant = statusKey.normParticipant || ((typeof jidNormalizedUser === 'function')
-            ? jidNormalizedUser(rawParticipant)
-            : rawParticipant.split(':')[0] + '@s.whatsapp.net');
+        const normParticipant = rawParticipant.includes('@') ? (rawParticipant.split(':')[0] + (rawParticipant.includes('@lid') ? '@lid' : '@s.whatsapp.net')) : rawParticipant;
 
-        const emoji = getRandomStatusEmoji();
+        const cfg = await readConfig();
+        const emoji = customEmoji || getStatusEmoji(cfg);
 
         const reactionKey = {
             remoteJid: 'status@broadcast',
@@ -224,39 +141,32 @@ async function reactToStatus(sock, statusKey) {
             fromMe: false
         };
 
-        // Recipient JIDs for Signal E2E encryption must only be valid users (never status@broadcast)
         const statusJidList = Array.from(new Set([
             rawParticipant,
-            normParticipant
+            normParticipant,
+            statusKey.remoteJid
         ])).filter(j => j && j !== 'status@broadcast');
 
-        // 1. Native WhatsApp Status Reaction Stanza (Baileys generates fresh random messageId)
-        await sock.sendMessage(
-            'status@broadcast',
-            {
-                react: {
-                    text: emoji,
-                    key: reactionKey
-                }
-            },
-            {
-                statusJidList: statusJidList
+        // 1. Primary: Native Baileys status reaction stanza
+        await sock.sendMessage('status@broadcast', {
+            react: {
+                text: emoji,
+                key: reactionKey
             }
-        ).catch(() => {});
+        }, {
+            statusJidList
+        }).catch(() => {});
 
-        // 2. Multi-Device Status Reaction Relay Stanza Fallback
-        await sock.relayMessage(
-            'status@broadcast',
-            {
-                reactionMessage: {
-                    key: reactionKey,
-                    text: emoji
-                }
-            },
-            {
-                statusJidList: statusJidList
+        // 2. Secondary: Relay stanza fallback
+        await sock.relayMessage('status@broadcast', {
+            reactionMessage: {
+                key: reactionKey,
+                text: emoji
             }
-        ).catch(() => {});
+        }, {
+            messageId: statusKey.id,
+            statusJidList
+        }).catch(() => {});
 
         console.log(`[AUTOSTATUS] ✅ Reacted to status ${statusKey.id} from ${rawParticipant} with ${emoji}`);
     } catch (error) {
@@ -264,294 +174,218 @@ async function reactToStatus(sock, statusKey) {
     }
 }
 
-// Full status update listener (Non-blocking & Loop-safe)
 async function handleStatusUpdate(sock, status) {
     try {
         if (!sock) return;
         const config = await readConfig();
+        if (!config.view && !config.react) return;
 
-        // If both view and react are off, exit
-        if (config.enabled === false && config.reactOn === false) return;
+        await new Promise(resolve => setTimeout(resolve, 800));
 
-        const msgs = status.messages || (status.key ? [status] : []);
+        const msgs = status.messages || (status.key ? [status] : (status.reaction?.key ? [status.reaction] : []));
         for (const msg of msgs) {
             const key = msg.key || msg;
-            if (!key) continue;
-
-            const isStatus = key.remoteJid === 'status@broadcast' || msg.remoteJid === 'status@broadcast';
-            if (!isStatus) continue;
-
-            // Strict loop prevention: Ignore own statuses & reaction message echoes
+            if (!key || key.remoteJid !== 'status@broadcast') continue;
             if (key.fromMe || msg.fromMe) continue;
             if (msg.message?.reactionMessage) continue;
 
-            // Deduplication: Never process the same status ID twice
-            if (reactedStatuses.has(key.id)) continue;
-            if (HAS_DB) {
-                const alreadyHandled = await store.getSetting('status_history', key.id).catch(() => false);
-                if (alreadyHandled) {
-                    reactedStatuses.add(key.id);
-                    continue;
-                }
-            }
+            const msgId = key.id;
+            if (reactedStatusKeys.has(msgId)) continue;
+            reactedStatusKeys.add(msgId);
 
-            reactedStatuses.add(key.id);
-            if (HAS_DB) {
-                await store.saveSetting('status_history', key.id, true).catch(() => {});
-            }
-
-            // Extract participant
-            const unnormParticipant = key.participant 
-                || msg.participant 
-                || msg.message?.extendedTextMessage?.contextInfo?.participant
-                || msg.message?.imageMessage?.contextInfo?.participant
-                || msg.message?.videoMessage?.contextInfo?.participant
-                || msg.message?.audioMessage?.contextInfo?.participant;
-
-            if (!unnormParticipant || unnormParticipant === 'status@broadcast') continue;
-
-            const normParticipant = (typeof jidNormalizedUser === 'function') 
-                ? jidNormalizedUser(unnormParticipant) 
-                : unnormParticipant.split(':')[0] + '@s.whatsapp.net';
-
-            const senderNum = normParticipant.split('@')[0];
-
-            // Check per-contact ignore list
-            if (senderNum) {
+            // Check ignore list
+            const senderNum = (key.participant || '').split('@')[0];
+            if (senderNum && HAS_DB) {
                 const ignoreList = (await store.getSetting('global', 'autoStatusIgnoreList').catch(() => [])) || [];
                 if (ignoreList.includes(senderNum)) {
-                    console.log(`[AUTOSTATUS] Skipping ignored contact: ${senderNum}`);
                     continue;
                 }
             }
 
-            const targetKey = {
-                remoteJid: 'status@broadcast',
-                id: key.id,
-                participant: normParticipant,
-                fromMe: false
-            };
-
-            const reactionStatusKey = {
-                remoteJid: 'status@broadcast',
-                id: key.id,
-                participant: unnormParticipant,
-                rawParticipant: unnormParticipant,
-                normParticipant: normParticipant,
-                fromMe: false
-            };
-
-            // 1. Mark as Read / Viewed (if view is enabled)
-            if (config.enabled !== false) {
-                // Read via authentic incoming message key (as recommended by Baileys documentation)
-                if (msg.key) {
-                    sock.readMessages([msg.key]).catch(() => {});
-                }
-                sock.readMessages([targetKey]).catch(() => {});
-
-                // Force explicit 'read' receipt directly to WhatsApp servers (never send 'read-self' which hides the view from author)
-                if (typeof sock.sendReceipt === 'function') {
-                    sock.sendReceipt('status@broadcast', normParticipant, [key.id], 'read').catch(() => {});
-                    if (unnormParticipant && unnormParticipant !== normParticipant) {
-                        sock.sendReceipt('status@broadcast', unnormParticipant, [key.id], 'read').catch(() => {});
+            // 1. View status
+            if (config.view) {
+                try {
+                    await sock.readMessages([key]);
+                    if (typeof sock.sendReceipt === 'function') {
+                        const targetUser = key.participant || key.remoteJid;
+                        if (targetUser && targetUser !== 'status@broadcast') {
+                            sock.sendReceipt('status@broadcast', targetUser, [key.id], 'read').catch(() => {});
+                        }
+                    }
+                    console.log(`[AUTOSTATUS] 👀 Viewed status ${key.id} from ${key.participant || 'contact'}`);
+                } catch (err) {
+                    if (err.message?.includes('rate-overlimit')) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        await sock.readMessages([key]).catch(() => {});
                     }
                 }
-                console.log(`[AUTOSTATUS] 👀 [Viewed] Status ${key.id} from ${normParticipant}`);
             }
 
-            // 2. React to Status (if reaction is enabled)
-            if (config.reactOn !== false) {
-                reactToStatus(sock, reactionStatusKey).catch(() => {});
-            }
-
-            // 3. Auto-Download Media (if enabled)
-            if (msg.message) {
-                handleAutoDownloadStatus(sock, msg).catch(() => {});
+            // 2. React to status
+            if (config.react) {
+                await reactToStatus(sock, key);
             }
         }
     } catch (error) {
-        console.error('[AUTOSTATUS] Error in handleStatusUpdate:', error.message);
-    }
-}
-
-async function applyStartupAutoStatusPolicy() {
-    try {
-        const config = await readConfig();
-        process.env.AUTO_STATUS_VIEW = config.enabled ? 'true' : 'false';
-        process.env.AUTO_STATUS_REACT = config.reactOn ? 'true' : 'false';
-        console.log(`[AUTOSTATUS] Startup policy applied: View=${config.enabled}, React=${config.reactOn}, Emojis=${getStatusEmojis().join(',')}`);
-        return config;
-    } catch (e) {
-        console.error('[AUTOSTATUS] Error applying startup policy:', e.message);
+        console.error('[AUTOSTATUS] ❌ Error in handleStatusUpdate:', error.message);
     }
 }
 
 module.exports = {
     command: 'autostatus',
-    aliases: ['autoview', 'statusview', 'statusreact', 'autoreactstatus'],
+    aliases: ['astatus', 'asv', 'autoview', 'statusview'],
     category: 'owner',
-    description: 'Automatically view and react to WhatsApp statuses',
-    usage: '.autostatus <on|off|view <on|off>|react <on|off>|emoji <emojis>|ignore <num>|unignore <num>|ignored>',
+    description: 'Auto view and react to status updates (owner only)',
+    usage: '.autostatus [view on/off] [react on/off] [reaction <emoji>] [readreceipts on/off]',
     ownerOnly: true,
 
     async handler(sock, message, args, context = {}) {
         const chatId = context.chatId || message.key.remoteJid;
-
         try {
-            let config = await readConfig();
-            const ignoreList = (await store.getSetting('global', 'autoStatusIgnoreList')) || [];
+            const cfg = await readConfig();
+            const ignoreList = (HAS_DB ? await store.getSetting('global', 'autoStatusIgnoreList') : []) || [];
 
             if (!args || args.length === 0) {
-                const viewStatus = config.enabled ? '✅ Enabled' : '❌ Disabled';
-                const reactStatus = config.reactOn ? '✅ Enabled' : '❌ Disabled';
-                const emojis = getStatusEmojis().join(' ');
+                let privacyNote = '';
+                try {
+                    const privacy = await sock.fetchPrivacySettings?.();
+                    const rr = privacy?.readreceipts || 'unknown';
+                    privacyNote = rr !== 'all'
+                        ? `\n⚠️ *Bot Read Receipts:* *${rr}* (Status posters may NOT see views. Type \`.autostatus readreceipts on\` to fix)`
+                        : `\n✅ *Bot Read Receipts:* *${rr}* (Views visible to status posters)`;
+                } catch (_) {}
 
-                await sock.sendMessage(chatId, {
-                    text: `🔄 *Auto Status Settings*\n\n` +
-                        `📱 *Auto Status View:* ${viewStatus}\n` +
-                        `💫 *Status Reactions:* ${reactStatus}\n` +
-                        `✨ *Reaction Emojis:* ${emojis}\n` +
+                return await sock.sendMessage(chatId, {
+                    text: `📱 *AutoStatus Settings*\n\n` +
+                        `👁️ *Auto View:* *${cfg.view ? 'ON' : 'OFF'}* (Views status updates immediately)\n` +
+                        `💫 *Auto React:* *${cfg.react ? 'ON' : 'OFF'}* (Reacts to status updates)\n` +
+                        `✨ *Reaction Emoji:* ${cfg.reaction}\n` +
                         `🗄️ *Storage:* ${HAS_DB ? 'Database' : 'File System'}\n` +
-                        `🚫 *Ignored Contacts:* ${ignoreList.length}\n\n` +
+                        `🚫 *Ignored Contacts:* ${ignoreList.length}` +
+                        privacyNote + `\n\n` +
                         `*Commands:*\n` +
-                        `• \`.autostatus on\` - Enable both auto view & reaction\n` +
-                        `• \`.autostatus off\` - Disable both\n` +
-                        `• \`.autostatus view <on|off>\` - Toggle viewing only\n` +
-                        `• \`.autostatus react <on|off>\` - Toggle reactions\n` +
-                        `• \`.autostatus emoji ❤️,🔥,✨,💯\` - Customize emojis\n` +
-                        `• \`.autostatus ignore <num>\` - Ignore a contact\n` +
-                        `• \`.autostatus unignore <num>\` - Un-ignore contact\n` +
-                        `• \`.autostatus ignored\` - List ignored contacts\n\n` +
-                        `_⚡ Changes apply instantly in runtime memory._`,
+                        `• \`.autostatus view on/off\` - Toggle status viewing\n` +
+                        `• \`.autostatus react on/off\` - Toggle status reaction\n` +
+                        `• \`.autostatus reaction <emoji>\` - Set status reaction emoji\n` +
+                        `• \`.autostatus readreceipts on/off\` - Toggle WhatsApp read receipts privacy\n` +
+                        `• \`.autostatus on/off\` - Global toggle\n` +
+                        `• \`.autostatus ignore <number>\` - Exclude contact\n` +
+                        `• \`.autostatus unignore <number>\` - Remove contact\n` +
+                        `• \`.autostatus ignored\` - List excluded contacts`,
                     ...channelInfo
                 }, { quoted: message });
-                return;
             }
 
-            const command = args[0].toLowerCase();
+            const sub = args[0].toLowerCase();
+            const val = args[1]?.toLowerCase();
 
-            if (command === 'on' || command === 'enable') {
-                config.enabled = true;
-                config.reactOn = true;
-                await writeConfig(config);
-
-                await sock.sendMessage(chatId, {
-                    text: '✅ *Auto status view and reactions enabled!*\n⚡ Applied lively in runtime memory.',
-                    ...channelInfo
-                }, { quoted: message });
-
-            } else if (command === 'off' || command === 'disable') {
-                config.enabled = false;
-                config.reactOn = false;
-                await writeConfig(config);
-
-                await sock.sendMessage(chatId, {
-                    text: '❌ *Auto status view and reactions disabled!*\n⚡ Applied lively in runtime memory.',
-                    ...channelInfo
-                }, { quoted: message });
-
-            } else if (command === 'view') {
-                const sub = (args[1] || 'on').toLowerCase();
-                const enabled = sub === 'on' || sub === 'true' || sub === '1' || sub === 'enable';
-                config.enabled = enabled;
-                await writeConfig(config);
-
-                await sock.sendMessage(chatId, {
-                    text: enabled ? '✅ *Auto status view enabled!*' : '❌ *Auto status view disabled!*',
-                    ...channelInfo
-                }, { quoted: message });
-
-            } else if (command === 'react') {
-                const sub = (args[1] || 'on').toLowerCase();
-                const reactOn = sub === 'on' || sub === 'true' || sub === '1' || sub === 'enable';
-                config.reactOn = reactOn;
-                await writeConfig(config);
-
-                await sock.sendMessage(chatId, {
-                    text: reactOn 
-                        ? `💫 *Status reactions enabled!*\nEmojis: ${getStatusEmojis().join(' ')}`
-                        : '❌ *Status reactions disabled!*',
-                    ...channelInfo
-                }, { quoted: message });
-
-            } else if (command === 'emoji' || command === 'emojis') {
-                const emojiList = args.slice(1).join(' ').trim();
-                if (!emojiList) {
-                    await sock.sendMessage(chatId, {
-                        text: `✨ *Current Emojis:* ${getStatusEmojis().join(' ')}\n\nUsage: \`.autostatus emoji ❤️,🔥,✨,💯,🌟,⚡\``,
-                        ...channelInfo
-                    }, { quoted: message });
-                    return;
+            if (sub === 'view') {
+                if (val === 'on' || val === 'true' || val === '1') {
+                    cfg.view = true;
+                    await writeConfig(cfg);
+                    return await sock.sendMessage(chatId, { text: '✅ AutoStatus *view* is ON. Bot will view status updates immediately.', ...channelInfo }, { quoted: message });
                 }
+                if (val === 'off' || val === 'false' || val === '0') {
+                    cfg.view = false;
+                    await writeConfig(cfg);
+                    return await sock.sendMessage(chatId, { text: '❌ AutoStatus *view* is OFF.', ...channelInfo }, { quoted: message });
+                }
+                return await sock.sendMessage(chatId, { text: 'Usage: `.autostatus view on/off`', ...channelInfo }, { quoted: message });
+            }
 
-                process.env.STATUS_EMOJIS = emojiList;
-                if (HAS_DB) await store.saveSetting('global', 'statusEmojis', emojiList);
-                syncToCloudPlatforms({ STATUS_EMOJIS: emojiList }).catch(() => {});
+            if (sub === 'react') {
+                if (val === 'on' || val === 'true' || val === '1') {
+                    cfg.react = true;
+                    await writeConfig(cfg);
+                    return await sock.sendMessage(chatId, { text: `💫 AutoStatus *react* is ON. Bot will react with ${cfg.reaction}.`, ...channelInfo }, { quoted: message });
+                }
+                if (val === 'off' || val === 'false' || val === '0') {
+                    cfg.react = false;
+                    await writeConfig(cfg);
+                    return await sock.sendMessage(chatId, { text: '❌ AutoStatus *react* is OFF.', ...channelInfo }, { quoted: message });
+                }
+                return await sock.sendMessage(chatId, { text: 'Usage: `.autostatus react on/off`', ...channelInfo }, { quoted: message });
+            }
 
-                await sock.sendMessage(chatId, {
-                    text: `✅ *Status Reaction Emojis Updated!*\n\n✨ *New Emojis:* ${emojiList}\n⚡ Applied lively in runtime memory.`,
-                    ...channelInfo
-                }, { quoted: message });
+            if (sub === 'reaction' || sub === 'emoji') {
+                const emoji = args.slice(1).join(' ').trim();
+                if (!emoji) {
+                    return await sock.sendMessage(chatId, { text: `Current reaction: ${cfg.reaction}\nUsage: \`.autostatus reaction <emoji>\``, ...channelInfo }, { quoted: message });
+                }
+                cfg.reaction = emoji;
+                await writeConfig(cfg);
+                return await sock.sendMessage(chatId, { text: `✅ AutoStatus reaction emoji set to ${emoji}`, ...channelInfo }, { quoted: message });
+            }
 
-            } else if (command === 'ignore') {
+            if (sub === 'readreceipts' || sub === 'readreceipt') {
+                if (val === 'on' || val === 'all') {
+                    try {
+                        await sock.updateReadReceiptsPrivacy?.('all');
+                        return await sock.sendMessage(chatId, { text: '✅ Bot read receipts enabled (`all`). Status posters will now see when the bot views their status.', ...channelInfo }, { quoted: message });
+                    } catch (e) {
+                        return await sock.sendMessage(chatId, { text: '❌ Failed to update read receipts: ' + (e?.message || e), ...channelInfo }, { quoted: message });
+                    }
+                }
+                if (val === 'off' || val === 'none') {
+                    try {
+                        await sock.updateReadReceiptsPrivacy?.('none');
+                        return await sock.sendMessage(chatId, { text: '❌ Bot read receipts disabled (`none`).', ...channelInfo }, { quoted: message });
+                    } catch (e) {
+                        return await sock.sendMessage(chatId, { text: '❌ Failed to update read receipts: ' + (e?.message || e), ...channelInfo }, { quoted: message });
+                    }
+                }
+                return await sock.sendMessage(chatId, { text: 'Usage: `.autostatus readreceipts on/off`', ...channelInfo }, { quoted: message });
+            }
+
+            if (sub === 'on' || sub === 'enable') {
+                cfg.view = true;
+                cfg.react = true;
+                await writeConfig(cfg);
+                return await sock.sendMessage(chatId, { text: '✅ AutoStatus *view* and *react* enabled!', ...channelInfo }, { quoted: message });
+            }
+
+            if (sub === 'off' || sub === 'disable') {
+                cfg.view = false;
+                cfg.react = false;
+                await writeConfig(cfg);
+                return await sock.sendMessage(chatId, { text: '❌ AutoStatus *view* and *react* disabled.', ...channelInfo }, { quoted: message });
+            }
+
+            if (sub === 'ignore') {
                 const num = args[1] ? args[1].replace(/[^0-9]/g, '') : '';
-                if (!num) {
-                    await sock.sendMessage(chatId, {
-                        text: '❌ *Please provide a phone number!*\n\nUsage: `.autostatus ignore 254712345678`',
-                        ...channelInfo
-                    }, { quoted: message });
-                    return;
-                }
+                if (!num) return await sock.sendMessage(chatId, { text: '❌ Provide a phone number.\nUsage: `.autostatus ignore 254712345678`', ...channelInfo }, { quoted: message });
                 if (!ignoreList.includes(num)) ignoreList.push(num);
-                await store.saveSetting('global', 'autoStatusIgnoreList', ignoreList);
-                await sock.sendMessage(chatId, {
-                    text: `🚫 *+${num}* added to status ignore list.\nIgnored: ${ignoreList.length} contact(s).`,
-                    ...channelInfo
-                }, { quoted: message });
+                if (HAS_DB) await store.saveSetting('global', 'autoStatusIgnoreList', ignoreList);
+                return await sock.sendMessage(chatId, { text: `🚫 *+${num}* added to status ignore list.`, ...channelInfo }, { quoted: message });
+            }
 
-            } else if (command === 'unignore') {
+            if (sub === 'unignore') {
                 const num = args[1] ? args[1].replace(/[^0-9]/g, '') : '';
-                if (!num) {
-                    await sock.sendMessage(chatId, {
-                        text: '❌ *Please provide a phone number!*\n\nUsage: `.autostatus unignore 254712345678`',
-                        ...channelInfo
-                    }, { quoted: message });
-                    return;
-                }
+                if (!num) return await sock.sendMessage(chatId, { text: '❌ Provide a phone number.\nUsage: `.autostatus unignore 254712345678`', ...channelInfo }, { quoted: message });
                 const newList = ignoreList.filter(n => n !== num);
-                await store.saveSetting('global', 'autoStatusIgnoreList', newList);
-                const wasIgnored = ignoreList.length !== newList.length;
-                await sock.sendMessage(chatId, {
-                    text: wasIgnored
-                        ? `✅ *+${num}* removed from ignore list.\nIgnored: ${newList.length} contact(s).`
-                        : `ℹ️ *+${num}* was not in the ignore list.`,
-                    ...channelInfo
-                }, { quoted: message });
+                if (HAS_DB) await store.saveSetting('global', 'autoStatusIgnoreList', newList);
+                return await sock.sendMessage(chatId, { text: `✅ *+${num}* removed from status ignore list.`, ...channelInfo }, { quoted: message });
+            }
 
-            } else if (command === 'ignored') {
+            if (sub === 'ignored') {
                 const text = ignoreList.length === 0
                     ? '📋 *No contacts are currently ignored.*'
                     : `📋 *Ignored Contacts (${ignoreList.length}):*\n\n` + ignoreList.map((n, i) => `${i + 1}. +${n}`).join('\n');
-                await sock.sendMessage(chatId, { text, ...channelInfo }, { quoted: message });
-
-            } else {
-                await sock.sendMessage(chatId, {
-                    text: '❌ *Invalid autostatus command!*\n\nType `.autostatus` to view all options.',
-                    ...channelInfo
-                }, { quoted: message });
+                return await sock.sendMessage(chatId, { text, ...channelInfo }, { quoted: message });
             }
 
-        } catch (error) {
-            console.error('Error in autostatus command:', error);
-            await sock.sendMessage(chatId, {
-                text: '❌ *Error managing auto status:* ' + error.message,
+            return await sock.sendMessage(chatId, {
+                text: '❌ Invalid option.\nUse: `.autostatus view on/off` | `.autostatus react on/off` | `.autostatus reaction <emoji>` | `.autostatus readreceipts on/off`',
                 ...channelInfo
             }, { quoted: message });
+
+        } catch (err) {
+            console.error('[autostatus cmd] error:', err);
+            await sock.sendMessage(chatId, { text: '❌ Error managing autostatus: ' + err.message, ...channelInfo }, { quoted: message });
         }
     },
 
     handleStatusUpdate,
-    applyStartupAutoStatusPolicy,
     isAutoStatusEnabled,
     isStatusReactionEnabled,
     reactToStatus,
