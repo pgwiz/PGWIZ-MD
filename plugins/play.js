@@ -15,8 +15,8 @@ module.exports = {
   command: 'play',
   aliases: ['plays', 'music', 'ytplay'],
   category: 'music',
-  description: 'Instantly play any song from YouTube or direct link',
-  usage: '.play <song name | youtube link>',
+  description: 'Instantly play any song from YouTube or Spotify',
+  usage: '.play <song name | youtube / spotify link>',
 
   async handler(sock, message, args, context = {}) {
     const chatId = context.chatId || message.key.remoteJid;
@@ -24,7 +24,7 @@ module.exports = {
 
     if (!query) {
       return await sock.sendMessage(chatId, {
-        text: '🎵 *Instant Music Player*\n\nUsage:\n• `.play <song name>` (e.g. `.play i feel it coming`)\n• `.play <youtube link>`'
+        text: '🎵 *Instant Music Player*\n\nUsage:\n• `.play <song name>` (e.g. `.play i feel it coming`)\n• `.play <youtube or spotify link>`'
       }, { quoted: message });
     }
 
@@ -83,7 +83,7 @@ module.exports = {
 
       // Fetch audio stream metadata from YTSP
       let streamMeta = null;
-      if (targetVideoId) {
+      if (targetVideoId && !directUrl.includes('spotify.com')) {
         try {
           const res = await axios.get(`${API_BASE}/stream/${targetVideoId}`, {
             params: { quality: 'audio' },
@@ -98,14 +98,14 @@ module.exports = {
         try {
           const res = await axios.get(`${API_BASE}/get`, {
             params: { ytl: directUrl, quality: 'audio' },
-            timeout: 15000,
+            timeout: 25000,
             headers: { 'User-Agent': 'Mozilla/5.0' }
           });
           if (res.data) {
             if (res.data.tracks && res.data.tracks.length > 0) {
               const track = res.data.tracks[0];
               const tId = track.videoId || track.id;
-              if (tId) {
+              if (tId && !directUrl.includes('spotify.com')) {
                 const sRes = await axios.get(`${API_BASE}/stream/${tId}`, {
                   params: { quality: 'audio' },
                   timeout: 15000
@@ -127,8 +127,8 @@ module.exports = {
 
       const finalTitle = streamMeta.title || targetTitle || 'Playing Track';
       const finalThumbnail = streamMeta.thumbnail || targetThumbnail || (targetVideoId ? `https://img.youtube.com/vi/${targetVideoId}/mqdefault.jpg` : '');
-      const finalUploader = streamMeta.uploader || targetUploader || 'YouTube';
-      const finalDuration = streamMeta.duration || targetDuration;
+      const finalUploader = streamMeta.uploader || streamMeta.artist || targetUploader || 'Artist';
+      const finalDuration = streamMeta.duration || streamMeta.duration_string || targetDuration;
       let proxyUrl = streamMeta.proxy_url || streamMeta.streamUrl || streamMeta.url;
 
       if (!proxyUrl) {

@@ -1,72 +1,190 @@
-// Lazy-loaded: const axios = require('axios');
+const axios = require('axios');
+
+const API_BASE = 'https://ytsp-api.pgwiz.cloud';
+const AXIOS_TIMEOUT = 60000;
+
+function cleanFileName(str) {
+  return (str || 'track').replace(/[\\/:*?"<>|]/g, '').trim();
+}
 
 module.exports = {
   command: 'spotify',
-  aliases: ['sp', 'spotifydl'],
+  aliases: ['sp', 'spotifydl', 'spot'],
   category: 'download',
-  description: 'Download music from Spotify',
-  usage: '.spotify <song/artist/keywords>',
-  
-  async handler(sock, message, args, context) {
-    const axios = require('axios');
-    const { chatId, channelInfo } = context;
-    
+  description: 'Play and download songs, albums, or playlists from Spotify (Keyless)',
+  usage: '.spotify <song name | spotify track / playlist / album url>',
+
+  async handler(sock, message, args, context = {}) {
+    const chatId = context.chatId || message.key.remoteJid;
+    const rawQuery = args.join(' ').trim();
+
+    if (!rawQuery) {
+      return await sock.sendMessage(chatId, {
+        text: '🟢 *Spotify Downloader*\n\nUsage:\n• `.spotify <song/artist/keywords>` (e.g. `.spotify blinding lights`)\n• `.spotify <spotify track link>`\n• `.spotify <spotify playlist/album link>`'
+      }, { quoted: message });
+    }
+
     try {
-      const query = args.join(' ');
+      await sock.sendMessage(chatId, { react: { text: '🔍', key: message.key } });
 
-      if (!query) {
-        await sock.sendMessage(chatId, { 
-          text: 'Usage: .spotify <song/artist/keywords>\nExample: .spotify con calma',
-          ...channelInfo
-        }, { quoted: message });
-        return;
+      const isSpotifyUrl = /^https?:\/\/(open\.)?spotify\.com\//i.test(rawQuery);
+      let targetUrl = rawQuery;
+      let trackMeta = null;
+
+      // 1. If text search query, find via Spotify search endpoint
+      if (!isSpotifyUrl) {
+        try {
+          const searchRes = await axios.get(`${API_BASE}/api/search/spotify`, {
+            params: { query: rawQuery, limit: 5 },
+            timeout: 12000
+          });
+          const results = searchRes.data?.results || [];
+          if (results.length > 0) {
+            const top = results[0];
+            trackMeta = {
+              title: top.title || top.name,
+              artist: top.artist,
+              thumbnail: top.thumbnail,
+              duration: top.duration,
+              url: top.spotifyUrl || top.url
+            };
+            if (top.spotifyUrl) {
+              targetUrl = top.spotifyUrl;
+            } else if (top.videoId) {
+              targetUrl = `https://www.youtube.com/watch?v=${top.videoId}`;
+            }
+          }
+        } catch (sErr) {
+          console.error('[Spotify Search API Error]:', sErr.message);
+        }
       }
 
-      const apiUrl = `https://okatsu-rolezapiiz.vercel.app/search/spotify?q=${encodeURIComponent(query)}`;
-      const { data } = await axios.get(apiUrl, { timeout: 20000, headers: { 'user-agent': 'Mozilla/5.0' } });
+      // 2. Fetch media stream and metadata from YTSP API
+      const getRes = await axios.get(`${API_BASE}/get`, {
+        params: { ytl: targetUrl, quality: 'audio' },
+        timeout: 30000,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
 
-      if (!data?.status || !data?.result) {
-        throw new Error('No result from Spotify API');
+      const data = getRes.data;
+      if (!data) {
+        throw new Error('Could not retrieve song details from media server.');
       }
 
-      const r = data.result;
-      const audioUrl = r.audio;
-      
-      if (!audioUrl) {
-        await sock.sendMessage(chatId, { 
-          text: 'No downloadable audio found for this query.',
-          ...channelInfo
+      // Handle Playlist / Album metadata display
+      if (data.is_playlist) {
+        const playlistTitle = data.playlist_name || data.title || 'Spotify Playlist';
+        const tracks = data.tracks || [];
+        let listText = `🟢 *Spotify Playlist / Album*\n💿 *${playlistTitle}*\n🔢 Total Tracks: ${data.total_tracks || tracks.length}\n\n`;
+        
+        tracks.slice(0, 15).forEach((t, i) => {
+          listText += `*${i + 1}.* ${t.title || t.name} - ${t.artist || 'Unknown'} (${t.duration || t.duration_string || 'N/A'})\n`;
+        });
+        
+        if (tracks.length > 15) {
+          listText += `\n_...and ${tracks.length - 15} more tracks._\n`;
+        }
+        listText += `\n> *To download a specific track, use:* \`.spotify <track name>\``;
+
+        return await sock.sendMessage(chatId, {
+          text: listText,
+          contextInfo: {
+            externalAdReply: {
+              title: playlistTitle,
+              body: `Spotify Collection • ${tracks.length} tracks`,
+              thumbnailUrl: tracks[0]?.thumbnail || 'https://open.spotify.com/favicon.ico',
+              sourceUrl: targetUrl,
+              mediaType: 1,
+              renderLargerThumbnail: true
+            }
+          }
         }, { quoted: message });
-        return;
       }
 
-      const caption = `🎵 ${r.title || r.name || 'Unknown Title'}\n👤 ${r.artist || ''}\n⏱ ${r.duration || ''}\n🔗 ${r.url || ''}`.trim();
+      // Single Track Resolution
+      const finalTitle = data.title || trackMeta?.title || 'Spotify Track';
+      const finalArtist = data.artist || data.uploader || trackMeta?.artist || 'Spotify Artist';
+      const finalDuration = data.duration || trackMeta?.duration || '3:30';
+      const finalThumbnail = data.thumbnail || trackMeta?.thumbnail || '';
+      let proxyUrl = data.proxy_url || data.streamUrl || data.url;
 
-      if (r.thumbnails) {
-        await sock.sendMessage(chatId, { 
-          image: { url: r.thumbnails }, 
-          caption,
-          ...channelInfo
-        }, { quoted: message });
-      } else if (caption) {
-        await sock.sendMessage(chatId, { 
-          text: caption,
-          ...channelInfo
-        }, { quoted: message });
+      if (!proxyUrl) {
+        throw new Error('No streaming audio URL available for this track.');
       }
-      
+      if (!proxyUrl.startsWith('http')) {
+        proxyUrl = `${API_BASE}${proxyUrl}`;
+      }
+
+      // Notify downloading
       await sock.sendMessage(chatId, {
-        audio: { url: audioUrl },
-        mimetype: 'audio/mpeg',
-        fileName: `${(r.title || r.name || 'track').replace(/[\\/:*?"<>|]/g, '')}.mp3`,
-        ...channelInfo
+        text: `🟢 *${finalTitle}*\n👤 *Artist:* ${finalArtist}\n⏱️ *Duration:* ${finalDuration}\n⏳ _Downloading high quality MP3..._`,
+        contextInfo: {
+          externalAdReply: {
+            title: finalTitle,
+            body: `${finalArtist} • ${finalDuration}`,
+            thumbnailUrl: finalThumbnail,
+            sourceUrl: isSpotifyUrl ? targetUrl : (data.videoId ? `https://youtube.com/watch?v=${data.videoId}` : API_BASE),
+            mediaType: 1,
+            renderLargerThumbnail: true
+          }
+        }
       }, { quoted: message });
 
-    } catch (error) {
-      console.error('[SPOTIFY] error:', error?.message || error);
-      await sock.sendMessage(chatId, { 
-        text: 'Failed to fetch Spotify audio. Try another query later.',
-        ...channelInfo
+      await sock.sendMessage(chatId, { react: { text: '⬇️', key: message.key } });
+
+      const audioBuffer = await axios.get(proxyUrl, {
+        responseType: 'arraybuffer',
+        timeout: AXIOS_TIMEOUT,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Referer': API_BASE
+        }
+      });
+
+      await sock.sendMessage(chatId, { react: { text: '⬆️', key: message.key } });
+
+      const fileName = `${cleanFileName(finalTitle)} - ${cleanFileName(finalArtist)}.mp3`;
+
+      // 1. Send as Playable Audio Stream
+      await sock.sendMessage(chatId, {
+        audio: audioBuffer.data,
+        mimetype: 'audio/mpeg',
+        fileName: fileName,
+        contextInfo: {
+          externalAdReply: {
+            title: finalTitle,
+            body: `Spotify • ${finalArtist}`,
+            thumbnailUrl: finalThumbnail,
+            sourceUrl: isSpotifyUrl ? targetUrl : `https://open.spotify.com`,
+            mediaType: 1,
+            renderLargerThumbnail: true
+          }
+        }
+      }, { quoted: message });
+
+      // 2. Send as Downloadable Document File
+      await sock.sendMessage(chatId, {
+        document: audioBuffer.data,
+        mimetype: 'audio/mpeg',
+        fileName: fileName,
+        contextInfo: {
+          externalAdReply: {
+            title: finalTitle,
+            body: 'Spotify MP3 Download',
+            thumbnailUrl: finalThumbnail,
+            sourceUrl: isSpotifyUrl ? targetUrl : `https://open.spotify.com`,
+            mediaType: 1,
+            renderLargerThumbnail: true
+          }
+        }
+      }, { quoted: message });
+
+      await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
+
+    } catch (err) {
+      console.error('[Spotify Handler Error]:', err.message);
+      await sock.sendMessage(chatId, {
+        text: `❌ *Spotify Download Failed!*\n\nReason: ${err.message || 'Service unavailable'}\n\nPlease verify your link or query and try again.`
       }, { quoted: message });
     }
   }

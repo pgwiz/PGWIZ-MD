@@ -25,7 +25,7 @@ async function fetchAudioStream(videoId, directUrl = '') {
   let errorMsg = '';
 
   // 1. Try YTSP stream/:videoId endpoint
-  if (videoId && videoId !== 'unknown') {
+  if (videoId && videoId !== 'unknown' && !videoId.includes('spotify.com')) {
     try {
       const res = await axios.get(`${API_BASE}/stream/${videoId}`, {
         params: { quality: 'audio' },
@@ -40,19 +40,19 @@ async function fetchAudioStream(videoId, directUrl = '') {
     }
   }
 
-  // 2. Try YTSP /get endpoint with URL
+  // 2. Try YTSP /get endpoint with URL (supports YouTube & Spotify URLs)
   if ((!streamData || !streamData.proxy_url) && directUrl) {
     try {
       const res = await axios.get(`${API_BASE}/get`, {
         params: { ytl: directUrl, quality: 'audio' },
-        timeout: 15000,
+        timeout: 25000,
         headers: { 'User-Agent': 'Mozilla/5.0' }
       });
       if (res.data) {
         if (res.data.tracks && res.data.tracks.length > 0) {
           const track = res.data.tracks[0];
           const tId = track.videoId || track.id;
-          if (tId) return await fetchAudioStream(tId, track.url);
+          if (tId && !directUrl.includes('spotify.com')) return await fetchAudioStream(tId, track.url);
           streamData = track;
         } else {
           streamData = res.data;
@@ -68,10 +68,10 @@ async function fetchAudioStream(videoId, directUrl = '') {
     if (proxyUrl) {
       if (!proxyUrl.startsWith('http')) proxyUrl = `${API_BASE}${proxyUrl}`;
       return {
-        title: streamData.title || 'Audio',
+        title: streamData.title || streamData.name || 'Audio',
         uploader: streamData.uploader || streamData.artist || 'Artist',
-        duration: streamData.duration || 'N/A',
-        thumbnail: streamData.thumbnail || (videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : ''),
+        duration: streamData.duration || streamData.duration_string || 'N/A',
+        thumbnail: streamData.thumbnail || (videoId && videoId !== 'unknown' ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : ''),
         downloadUrl: proxyUrl,
         videoId: videoId || streamData.videoId
       };
@@ -108,7 +108,7 @@ async function handleSongSelection(sock, chatId, senderId, text, message) {
       contextInfo: {
         externalAdReply: {
           title: title,
-          body: `By ${streamInfo.uploader || 'YouTube'} • ${streamInfo.duration}`,
+          body: `By ${streamInfo.uploader || 'Artist'} • ${streamInfo.duration}`,
           thumbnailUrl: thumbnail,
           sourceUrl: videoUrl,
           mediaType: 1,
@@ -179,8 +179,8 @@ module.exports = {
   command: 'song',
   aliases: ['mp3', 'songdoc'],
   category: 'music',
-  description: 'Download music from YouTube by search or direct URL',
-  usage: '.song <song name | youtube url>',
+  description: 'Download music from YouTube or Spotify by search or direct URL',
+  usage: '.song <song name | youtube / spotify link>',
 
   async handler(sock, message, args, context = {}) {
     const chatId = context.chatId || message.key.remoteJid;
@@ -188,19 +188,20 @@ module.exports = {
 
     if (!query) {
       return await sock.sendMessage(chatId, {
-        text: '🎵 *Music Downloader*\n\nUsage:\n• `.song <song name>` (Search list)\n• `.song <youtube link>` (Direct download)'
+        text: '🎵 *Music Downloader*\n\nUsage:\n• `.song <song name>` (Search list)\n• `.song <youtube or spotify link>` (Direct download)'
       }, { quoted: message });
     }
 
-    // Direct YouTube Link Handling
+    // Direct YouTube / Spotify Link Handling
     if (query.match(/^https?:\/\//i)) {
-      const vId = extractYouTubeId(query) || 'unknown';
+      const isSpotify = query.includes('spotify.com');
+      const vId = extractYouTubeId(query) || (isSpotify ? 'spotify' : 'unknown');
       pendingSelections.set(chatId, {
         results: [{
-          title: 'Direct Link Track',
+          title: isSpotify ? 'Spotify Track' : 'Direct Link Track',
           videoId: vId,
           id: vId,
-          thumbnail: vId !== 'unknown' ? `https://img.youtube.com/vi/${vId}/mqdefault.jpg` : '',
+          thumbnail: vId !== 'unknown' && vId !== 'spotify' ? `https://img.youtube.com/vi/${vId}/mqdefault.jpg` : '',
           url: query
         }]
       });
