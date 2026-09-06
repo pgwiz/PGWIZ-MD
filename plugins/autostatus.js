@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const store = require('../lib/lightweight_store');
 const settings = require('../settings');
 
@@ -122,16 +121,31 @@ setInterval(() => {
     if (reactedStatusKeys.size > 2000) reactedStatusKeys.clear();
 }, 60000);
 
+// In-memory cache of recent status messages per participant/number
+const recentStatusCache = new Map();
+function cacheRecentStatus(key) {
+    if (!key || !key.id) return;
+    const participant = key.participant || key.remoteJid;
+    if (participant && participant !== 'status@broadcast') {
+        recentStatusCache.set(participant, key);
+        const num = participant.split('@')[0];
+        if (num) recentStatusCache.set(num, key);
+    }
+    // Limit cache size to 500 entries
+    if (recentStatusCache.size > 500) {
+        const firstKey = recentStatusCache.keys().next().value;
+        recentStatusCache.delete(firstKey);
+    }
+}
+
 async function reactToStatus(sock, statusKey, customEmoji = null) {
     try {
-        if (!sock || !statusKey?.id) return;
-        const enabled = await isStatusReactionEnabled();
-        if (!enabled) return;
+        if (!sock || !statusKey?.id) return false;
+        const enabled = customEmoji ? true : await isStatusReactionEnabled();
+        if (!enabled) return false;
 
         const rawParticipant = statusKey.participant || statusKey.remoteJid;
-        if (!rawParticipant || rawParticipant === 'status@broadcast') return;
-
-        const normParticipant = rawParticipant.includes('@') ? (rawParticipant.split(':')[0] + (rawParticipant.includes('@lid') ? '@lid' : '@s.whatsapp.net')) : rawParticipant;
+        if (!rawParticipant || rawParticipant === 'status@broadcast') return false;
 
         const cfg = await readConfig();
         const emoji = customEmoji || getStatusEmoji(cfg);
@@ -144,22 +158,11 @@ async function reactToStatus(sock, statusKey, customEmoji = null) {
         };
 
         const statusJidList = Array.from(new Set([
-            rawParticipant,
-            normParticipant,
-            statusKey.remoteJid
+            statusKey.remoteJid,
+            rawParticipant
         ])).filter(j => j && j !== 'status@broadcast');
 
-        // 1. Primary: Native Baileys status reaction stanza
-        await sock.sendMessage('status@broadcast', {
-            react: {
-                text: emoji,
-                key: reactionKey
-            }
-        }, {
-            statusJidList
-        }).catch(() => {});
-
-        // 2. Secondary: Relay stanza fallback
+        // Relay reaction stanza to status@broadcast
         await sock.relayMessage('status@broadcast', {
             reactionMessage: {
                 key: reactionKey,
@@ -167,12 +170,14 @@ async function reactToStatus(sock, statusKey, customEmoji = null) {
             }
         }, {
             messageId: statusKey.id,
-            statusJidList
-        }).catch(() => {});
+            statusJidList: statusJidList.length > 0 ? statusJidList : [rawParticipant]
+        });
 
         console.log(`[AUTOSTATUS] ✅ Reacted to status ${statusKey.id} from ${rawParticipant} with ${emoji}`);
+        return true;
     } catch (error) {
         console.error('[AUTOSTATUS] ❌ Error reacting to status:', error.message);
+        return false;
     }
 }
 
@@ -195,6 +200,9 @@ async function handleStatusUpdate(sock, status) {
             if (reactedStatusKeys.has(msgId)) continue;
             reactedStatusKeys.add(msgId);
 
+            // Cache for dev/debug lookup
+            cacheRecentStatus(key);
+
             // Check ignore list
             const senderNum = (key.participant || '').split('@')[0];
             if (senderNum && HAS_DB) {
@@ -204,16 +212,10 @@ async function handleStatusUpdate(sock, status) {
                 }
             }
 
-            // 1. View status
+            // 1. View status (use only standard Baileys readMessages)
             if (config.view) {
                 try {
                     await sock.readMessages([key]);
-                    if (typeof sock.sendReceipt === 'function') {
-                        const targetUser = key.participant || key.remoteJid;
-                        if (targetUser && targetUser !== 'status@broadcast') {
-                            sock.sendReceipt('status@broadcast', targetUser, [key.id], 'read').catch(() => {});
-                        }
-                    }
                     console.log(`[AUTOSTATUS] 👀 Viewed status ${key.id} from ${key.participant || 'contact'}`);
                 } catch (err) {
                     if (err.message?.includes('rate-overlimit')) {
@@ -284,10 +286,9 @@ module.exports = {
             // === Hidden Dev Diagnostic Probe Command ===
             if (sub === 'dev' || sub === 'test' || sub === 'debug') {
                 const targetInput = args[1]?.trim();
-                const customEmoji = args[2]?.trim() || cfg.reaction || '💚';
+                const customEmoji = args[2]?.trim() || (targetInput && !targetInput.match(/^[0-9+@.]/) ? targetInput : null) || cfg.reaction || '💚';
 
-                let targetId = '';
-                let targetParticipant = '';
+                let targetKey = null;
 
                 // 1. Check if user quoted a status message
                 let innerMsg = message.message;
@@ -296,37 +297,38 @@ module.exports = {
                 const mType = innerMsg ? Object.keys(innerMsg)[0] : '';
                 const ctx = innerMsg?.[mType]?.contextInfo || innerMsg?.extendedTextMessage?.contextInfo || message.message?.extendedTextMessage?.contextInfo;
 
-                if (ctx && ctx.remoteJid === 'status@broadcast') {
-                    targetId = ctx.stanzaId || '';
-                    targetParticipant = ctx.participant || '';
+                if (ctx && ctx.remoteJid === 'status@broadcast' && ctx.stanzaId) {
+                    targetKey = {
+                        remoteJid: 'status@broadcast',
+                        id: ctx.stanzaId,
+                        participant: ctx.participant || '',
+                        fromMe: false
+                    };
                 }
 
-                // 2. If target number or JID provided
-                if (!targetId && targetInput) {
+                // 2. If target number or JID provided, look up in recentStatusCache
+                if (!targetKey && targetInput && targetInput.match(/^[0-9+@]/)) {
                     const cleanNum = targetInput.replace(/[^0-9]/g, '');
-                    if (cleanNum) {
-                        targetParticipant = `${cleanNum}@s.whatsapp.net`;
-                        if (HAS_DB) {
-                            try {
-                                const history = await store.loadMessage?.('status@broadcast', cleanNum);
-                                if (history?.key?.id) targetId = history.key.id;
-                            } catch {}
-                        }
-                        if (!targetId) {
-                            targetId = '3EB0' + crypto.randomBytes(8).toString('hex').toUpperCase();
-                        }
-                    } else if (targetInput.includes('@')) {
-                        targetParticipant = targetInput;
-                        targetId = '3EB0' + crypto.randomBytes(8).toString('hex').toUpperCase();
+                    const cached = recentStatusCache.get(cleanNum) || recentStatusCache.get(targetInput);
+                    if (cached) {
+                        targetKey = cached;
                     }
                 }
 
-                if (!targetParticipant) {
+                if (!targetKey) {
+                    const cachedCount = recentStatusCache.size;
                     return await sock.sendMessage(chatId, {
-                        text: `🛠️ *AutoStatus Dev Diagnostic Tool*\n\n*Usage:*\n• Reply to a status: \`.autostatus dev [emoji]\`\n• By Phone Number: \`.autostatus dev 254712345678 [emoji]\`\n• By JID: \`.autostatus dev 254712345678@s.whatsapp.net [emoji]\`\n\n_Runs force-reaction probe and monitors socket events for 30s before reporting to Owner DM._`,
+                        text: `🛠️ *AutoStatus Dev Diagnostic Tool*\n\n` +
+                            `*Usage:* Reply to any status message with:\n` +
+                            `• \`.autostatus dev [emoji]\`\n\n` +
+                            (targetInput ? `⚠️ *No active status from \`${targetInput}\` found in cache.* (${cachedCount} statuses in memory)\n` : '') +
+                            `_Please reply to a status message directly to run live diagnostic force-reaction._`,
                         ...channelInfo
                     }, { quoted: message });
                 }
+
+                const targetParticipant = targetKey.participant || targetKey.remoteJid;
+                const targetId = targetKey.id;
 
                 const startTime = Date.now();
                 const logs = [];
@@ -355,47 +357,23 @@ module.exports = {
                     log(`Privacy check error: ${pe.message}`);
                 }
 
-                // Step 2: Build JID List with LID & Normalized support
-                const rawParticipant = targetParticipant;
-                const normParticipant = rawParticipant.includes('@')
-                    ? (rawParticipant.split(':')[0] + (rawParticipant.includes('@lid') ? '@lid' : '@s.whatsapp.net'))
-                    : rawParticipant;
-
-                const statusJidList = Array.from(new Set([
-                    rawParticipant,
-                    normParticipant
-                ])).filter(j => j && j !== 'status@broadcast');
-
-                log(`Constructed statusJidList: [${statusJidList.join(', ')}]`);
-
-                const reactionKey = {
-                    remoteJid: 'status@broadcast',
-                    id: targetId,
-                    participant: rawParticipant,
-                    fromMe: false
-                };
-
-                // Step 3: Test Native sendMessage Reaction
+                // Step 2: Mark Viewed
                 try {
-                    const sendRes = await sock.sendMessage('status@broadcast', {
-                        react: { text: customEmoji, key: reactionKey }
-                    }, { statusJidList });
-                    log(`Native sendMessage dispatched (statusKey: ${sendRes?.key?.id || 'OK'})`);
-                } catch (se) {
-                    log(`Native sendMessage error: ${se.message}`);
+                    await sock.readMessages([targetKey]);
+                    log(`readMessages dispatched for status ${targetId}`);
+                } catch (ve) {
+                    log(`readMessages error: ${ve.message}`);
                 }
 
-                // Step 4: Test RelayMessage Reaction
+                // Step 3: Dispatch Reaction via relayMessage
                 try {
-                    const relayRes = await sock.relayMessage('status@broadcast', {
-                        reactionMessage: { key: reactionKey, text: customEmoji }
-                    }, { messageId: targetId, statusJidList });
-                    log(`RelayMessage dispatched (relayId: ${relayRes || targetId})`);
+                    const reactOk = await reactToStatus(sock, targetKey, customEmoji);
+                    log(`relayMessage reaction dispatched: ${reactOk ? 'SUCCESS' : 'FAILED'}`);
                 } catch (re) {
-                    log(`RelayMessage error: ${re.message}`);
+                    log(`relayMessage error: ${re.message}`);
                 }
 
-                // Step 5: Attach 30-Second Event Listener Collector
+                // Step 4: Attach 30-Second Event Listener Collector
                 const receiptEvents = [];
                 const updateEvents = [];
 
@@ -442,7 +420,6 @@ module.exports = {
                             `🆔 *Stanza ID:* \`${targetId}\`\n` +
                             `✨ *Reaction Emoji:* ${customEmoji}\n` +
                             `🔒 *Read Receipts Privacy:* \`${privacyState}\`\n` +
-                            `📡 *Recipients in JidList:* ${statusJidList.length}\n` +
                             `📬 *Receipt Events:* ${receiptEvents.length}\n` +
                             `🔄 *Update Events:* ${updateEvents.length}\n\n` +
                             `📋 *Diagnostic Log Timeline:*\n\`\`\`\n` +
@@ -451,10 +428,10 @@ module.exports = {
                             `> _Generated by MEGA-MD Developer Diagnostics_`;
 
                         if (ownerJid && ownerJid !== '@s.whatsapp.net') {
-                            await sock.sendMessage(ownerJid, { text: report });
+                            await sock.sendMessage(ownerJid, { text: report }).catch(() => {});
                         }
                         if (chatId !== ownerJid) {
-                            await sock.sendMessage(chatId, { text: `✅ *AutoStatus Dev Probe Finished.* Diagnostic report sent to Owner DM.` });
+                            await sock.sendMessage(chatId, { text: `✅ *AutoStatus Dev Probe Finished.* Diagnostic report sent to Owner DM.` }).catch(() => {});
                         }
                     } catch (e) {
                         console.error('[autostatus dev report error]:', e.message);

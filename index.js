@@ -1127,8 +1127,9 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (err) => {
-    printLog('error', `Unhandled Rejection: ${err.message}`);
-    console.error(err.stack);
+    if (err?.message?.includes('Connection Closed') || err?.output?.statusCode === 428 || err?.message?.includes('rate-overlimit')) return;
+    printLog('error', `Unhandled Rejection: ${err?.message || err}`);
+    if (err?.stack) console.error(err.stack);
 });
 
 server.on('error', (error) => {
