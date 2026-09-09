@@ -24,11 +24,6 @@ The following downloaders were audited and flagged as currently non-functional d
    - **Issue**: `discardapi.dpdns.org` returns `HTTP 503`.
    - **Planned Fix**: Integrate direct SoundCloud v2 API / client_id resolver or alternative streaming endpoints.
 
-5. **Lyrics Finder (`.lyrics`)**
-   - **Target File**: `plugins/lyrics.js`
-   - **Issue**: `discardapi.dpdns.org` returns `HTTP 503`.
-   - **Planned Fix**: Integrate Genius / Musixmatch / AZLyrics direct parser or Lyrics.ovh API.
-
 6. **APK Downloaders (`.apkmirror` / `.apkpure`)**
    - **Target File**: `plugins/apkmirror.js`, `plugins/apkpure.js`
    - **Issue**: `discardapi.dpdns.org` returns `HTTP 503`.
@@ -52,6 +47,7 @@ The following downloaders were audited and flagged as currently non-functional d
 ---
 
 ### 🟢 Fully Functional & Verified Downloaders:
+* **`.lyrics` / `.lyric` / `.songlyrics`**: Multi-provider high-speed lyrics engine (LRCLIB + iTunes 600x600 HD artwork + Lyrics.ovh fallback).
 * **`.spotify` / `.sp` / `.spotifydl`**: Powered by `https://ytsp-api.pgwiz.cloud` with 100% keyless Spotify metadata embed extraction, YouTube audio stream bridge, playlist/album tracklist overview, and dual playable voice audio + downloadable MP3 document.
 * **`.song` / `.mp3`**: Powered by `https://ytsp-api.pgwiz.cloud` (Dual playable audio + MP3 document, seamless YouTube & Spotify link detection).
 * **`.play` / `.music`**: Instant YouTube and Spotify audio player via `https://ytsp-api.pgwiz.cloud`.

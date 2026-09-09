@@ -55,6 +55,9 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy application source files
 COPY . .
 
+# Ensure writable directories for session and database
+RUN mkdir -p /app/session /app/data && chmod -R 777 /app/session /app/data
+
 # Expose HTTP healthcheck port
 EXPOSE 5000
 
