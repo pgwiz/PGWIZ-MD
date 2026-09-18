@@ -2,6 +2,22 @@
 
 All notable changes to the PGWIZ-MD multi-device WhatsApp bot project are documented in this file.
 
+## [4.6.0] - 2026-09-18
+
+### Fixed
+- **Always-Online Text Response Drop (`type === 'append'`)**:
+  - Resolved issue where enabling Always-Online (`.alwaysonline on` or `ALWAYS_ONLINE=true`) prevented the bot from responding to text messages.
+  - When Always-Online or companion sync is active, WhatsApp delivers real-time synchronized messages under `chatUpdate.type === 'append'`. Updated `lib/messageHandler.js` and `lib/messageHandler_raw.js` to accept both `'notify'` and `'append'` updates.
+  - Fixed `messageAge` latency check calculation when timestamps are undefined or delayed during companion sync.
+  - Refactored `plugins/alwaysonline.js` and `plugins/presence.js` to send account-wide available presence stanzas without chat-specific JIDs.
+
+### Added & Enhanced
+- **Session Scanner Phone Pairing Parity**:
+  - Implemented MEGA phone pairing route parity on session scanner (`web-qr-pair`): `GET /pair?number=...` now seamlessly returns `{ code: "XXXX-XXXX", sessionId }`.
+  - Added session persistence to `sessions/<id>/creds.json`, Supabase sync, and frontend polling completion flag so the web UI transitions cleanly to "Session Ready!".
+  - Added direct base64 `PGWIZ~...` and `MEGA~...` prefixed session decoding in `lib/session.js`.
+  - Updated `plugins/pair.js` with primary PGWIZ cloud session scanner endpoint and automatic fallback.
+
 ## [4.5.0] - 2026-09-17
 
 ### Fixed

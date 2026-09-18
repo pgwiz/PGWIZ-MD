@@ -45,9 +45,22 @@ module.exports = {
     }, { quoted: message });
 
     try {
-      const response = await axios.get(`https://mega-pairing.onrender.com/pair?number=${number}`, {
-        timeout: 60000
-      });
+      let response = null;
+      const endpoints = [
+        `https://session-s.pgwiz.cloud/pair?number=${number}`,
+        `https://mega-pairing.onrender.com/pair?number=${number}`
+      ];
+      for (const url of endpoints) {
+        try {
+          response = await axios.get(url, {
+            headers: { 'Accept': 'application/json' },
+            timeout: 35000
+          });
+          if (response?.data?.code && !response.data.code.includes("Unavailable") && !response.data.code.includes("Error")) {
+            break;
+          }
+        } catch {}
+      }
 
       if (response.data && response.data.code) {
         const pairingCode = response.data.code;

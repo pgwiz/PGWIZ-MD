@@ -116,7 +116,7 @@ module.exports = {
 
                 if (!ghostActive) {
                     startAlwaysOnlineLoop(sock);
-                    if (chatId) await sock.sendPresenceUpdate('available', chatId).catch(() => {});
+                    await sock.sendPresenceUpdate('available').catch(() => {});
                 }
 
                 return await sock.sendMessage(chatId, {
@@ -131,7 +131,7 @@ module.exports = {
                 await store.saveSetting('global', 'presenceConfig', { alwaysOnline: false });
 
                 stopAlwaysOnlineLoop(sock);
-                if (chatId) await sock.sendPresenceUpdate('unavailable', chatId).catch(() => {});
+                await sock.sendPresenceUpdate('unavailable').catch(() => {});
 
                 return await sock.sendMessage(chatId, {
                     text: '❌ *Always-Online is now DISABLED.*\n\nPresence set to unavailable. Phone will now receive push notifications normally without desktop client suppression.',

@@ -114,7 +114,7 @@ module.exports = {
         if (action === 'available' || action === 'online') {
             config.mode = 'available';
             await savePresenceConfig(config);
-            await sendPresence(sock, 'available', chatId);
+            await sendPresence(sock, 'available');
             await sock.sendMessage(chatId, {
                 text: '✅ *Presence set to AVAILABLE (Online)!*',
                 ...channelInfo
@@ -126,7 +126,7 @@ module.exports = {
         if (action === 'unavailable' || action === 'offline') {
             config.mode = 'unavailable';
             await savePresenceConfig(config);
-            await sendPresence(sock, 'unavailable', chatId);
+            await sendPresence(sock, 'unavailable');
             await sock.sendMessage(chatId, {
                 text: '💤 *Presence set to UNAVAILABLE (Offline)!*\n_Phone will now receive direct push notifications without desktop suppression._',
                 ...channelInfo
