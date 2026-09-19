@@ -37,9 +37,9 @@ async function fetchTikTokData(rawUrl) {
   const url = await resolveCanonicalUrl(rawUrl);
   let errors = [];
 
-  // 1. Primary Engine: TikWM API (HD No Watermark + MP3 + Photos)
+  // 1. Primary Engine: TikWM API (Standard/Lowest Quality No Watermark + MP3 + Photos)
   try {
-    const res = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`, {
+    const res = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
       timeout: 15000,
       headers: {
         'User-Agent': USER_AGENT,
@@ -49,7 +49,8 @@ async function fetchTikTokData(rawUrl) {
 
     if (res.data?.code === 0 && res.data.data) {
       const d = res.data.data;
-      let videoUrl = d.hdplay || d.play || d.wmplay;
+      // Prioritize lowest/standard resolution watermark-free video (d.play), then with watermark (d.wmplay), last resort hdplay
+      let videoUrl = d.play || d.wmplay || d.hdplay;
       if (videoUrl && !videoUrl.startsWith('http')) videoUrl = 'https://www.tikwm.com' + videoUrl;
       let musicUrl = d.music;
       if (musicUrl && !musicUrl.startsWith('http')) musicUrl = 'https://www.tikwm.com' + musicUrl;
@@ -68,7 +69,7 @@ async function fetchTikTokData(rawUrl) {
         videoUrl: videoUrl,
         musicUrl: musicUrl,
         images: Array.isArray(d.images) && d.images.length > 0 ? d.images : null,
-        isHD: Boolean(d.hdplay)
+        isHD: false
       };
     }
   } catch (e1) {
@@ -114,7 +115,8 @@ async function fetchTikTokData(rawUrl) {
         if (src) images.push(src);
       });
 
-      const finalVideo = hdVideoUrl || videoUrl;
+      // Prioritize lowest/standard quality videoUrl over hdVideoUrl
+      const finalVideo = videoUrl || hdVideoUrl;
       if (finalVideo || images.length > 0) {
         return {
           title: title,
@@ -130,7 +132,7 @@ async function fetchTikTokData(rawUrl) {
           videoUrl: finalVideo,
           musicUrl: musicUrl,
           images: images.length > 0 ? images : null,
-          isHD: Boolean(hdVideoUrl)
+          isHD: false
         };
       }
     }
@@ -185,7 +187,8 @@ async function fetchTikTokData(rawUrl) {
         }
       });
 
-      const finalVideo = hdVideoUrl || videoUrl;
+      // Prioritize lowest/standard quality videoUrl over hdVideoUrl
+      const finalVideo = videoUrl || hdVideoUrl;
       if (finalVideo) {
         return {
           title: 'TikTok Video',
@@ -201,7 +204,7 @@ async function fetchTikTokData(rawUrl) {
           videoUrl: finalVideo,
           musicUrl: musicUrl,
           images: null,
-          isHD: Boolean(hdVideoUrl)
+          isHD: false
         };
       }
     }
@@ -216,7 +219,7 @@ module.exports = {
   command: 'tiktok',
   aliases: ['tt', 'ttdl', 'tiktokdl', 'tiktoknowm'],
   category: 'download',
-  description: 'Download TikTok video (HD No Watermark), photo slides, or audio',
+  description: 'Download TikTok video (Lowest / Standard Quality), photo slides, or audio',
   usage: '.tiktok <TikTok URL> [mp3/audio]',
 
   async handler(sock, message, args, context = {}) {
@@ -226,7 +229,7 @@ module.exports = {
 
     if (!url || !isValidTikTokUrl(url)) {
       return await sock.sendMessage(chatId, {
-        text: '🎵 *TikTok Downloader (HD No Watermark)*\n\n' +
+        text: '🎵 *TikTok Downloader (Lowest / Standard Quality)*\n\n' +
           '*Usage:*\n' +
           '• `.tiktok <TikTok link>` - Download Video or Photo Slide\n' +
           '• `.tiktok <TikTok link> audio` - Extract Audio only\n\n' +
@@ -304,7 +307,7 @@ module.exports = {
         return;
       }
 
-      // 3. HD Video mode
+      // 3. Video mode (lowest / standard quality)
       if (!data.videoUrl) {
         throw new Error('No downloadable video stream found');
       }
@@ -324,7 +327,7 @@ module.exports = {
 📝 *Caption:*
 ${data.title || 'No caption'}
 
-✨ *Quality:* ${data.isHD ? 'HD No Watermark' : 'No Watermark'}
+✨ *Quality:* ${data.isHD ? 'Standard (HD Fallback)' : 'Lowest / Standard (Data Saver)'}
 ━━━━━━━━━━━━━━━━━━━
 > *Downloaded via MEGA-MD*`;
 

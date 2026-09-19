@@ -2,6 +2,15 @@
 
 All notable changes to the PGWIZ-MD multi-device WhatsApp bot project are documented in this file.
 
+## [4.6.1] - 2026-09-19
+
+### Changed
+- **TikTok Downloader Lowest Quality Optimization (`.tiktok` / `.tt`)**:
+  - Configured TikTok media extractor to prioritize standard / lowest quality stream (`d.play` SD resolution) over high-bitrate HD streams (`d.hdplay`).
+  - Removed explicit `&hd=1` parameter from TikWM API requests to reduce file size from ~50–90MB to ~2–6MB, ensuring fast downloads and preventing memory/timeout issues.
+  - Configured SaveTik and MusicalDown fallback engines to prioritize standard definition MP4 streams over HD alternatives.
+  - Updated downloader captions and descriptors to indicate optimized lowest/standard data saver quality.
+
 ## [4.6.0] - 2026-09-18
 
 ### Fixed
