@@ -595,17 +595,25 @@ async function executeReactionStrategy(sock, strategyNum, statusKey, emoji) {
 
     switch (Number(strategyNum)) {
         case 1: {
-            // Strategy 1: Dual-JID Native Broadcast React (Fortunatus & PGWIZ Standard)
-            const targets = Array.from(new Set([rawParticipant, phoneJid, userPhone, userLid])).filter(j => j && j !== 'status@broadcast');
-            const statusJidList = targets.length > 0 ? targets : [rawParticipant];
+            // Strategy 1: Fortunatus-Exact Raw Key React
+            // Use the RAW statusKey from the Baileys event directly — do NOT rebuild it.
+            // WhatsApp requires the exact server-generated key (includes participantPn, etc).
+            // Prefer participantPn (phone JID) over LID for statusJidList.
+            const phoneTarget = statusKey.participantPn || phoneJid;
+            const botJid = userPhone || userLid;
+            const jidSet = new Set();
+            if (phoneTarget && phoneTarget !== 'status@broadcast') jidSet.add(phoneTarget);
+            if (rawParticipant && rawParticipant !== 'status@broadcast') jidSet.add(rawParticipant);
+            if (botJid) jidSet.add(botJid);
+            const statusJidList = Array.from(jidSet).filter(Boolean);
 
             return await sock.sendMessage('status@broadcast', {
                 react: {
                     text: emoji,
-                    key: reactionKey
+                    key: statusKey   // <- raw Baileys key, exactly like Fortunatus' mek.key
                 }
             }, {
-                statusJidList
+                statusJidList: statusJidList.length > 0 ? statusJidList : [rawParticipant]
             });
         }
         case 2: {
