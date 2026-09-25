@@ -12,7 +12,7 @@ const HAS_DB = !!(MONGO_URL || POSTGRES_URL || MYSQL_URL || SQLITE_URL);
 const configPath = path.join(__dirname, '../data/autoStatus.json');
 
 const STRATEGY_DESCRIPTIONS = {
-    1: 'GlobalTech Broadcast Relay (Clean & Standard)',
+    1: 'Dual-JID Native Broadcast React (Fortunatus & PGWIZ Standard)',
     2: 'Fresh ID Broadcast Relay (Multi-Device List)',
     3: 'Broadcast Relay (Direct Target List)',
     4: 'Native Broadcast React (sendMessage to status@broadcast)',
@@ -595,18 +595,16 @@ async function executeReactionStrategy(sock, strategyNum, statusKey, emoji) {
 
     switch (Number(strategyNum)) {
         case 1: {
-            // Strategy 1: Upstream GlobalTech Broadcast Relay (Clean, Proven Standard)
-            const targets = Array.from(new Set([rawParticipant, phoneJid])).filter(j => j && j !== 'status@broadcast');
+            // Strategy 1: Dual-JID Native Broadcast React (Fortunatus & PGWIZ Standard)
+            const targets = Array.from(new Set([rawParticipant, phoneJid, userPhone, userLid])).filter(j => j && j !== 'status@broadcast');
             const statusJidList = targets.length > 0 ? targets : [rawParticipant];
 
-            return await sock.relayMessage('status@broadcast', {
-                reactionMessage: {
-                    key: reactionKey,
+            return await sock.sendMessage('status@broadcast', {
+                react: {
                     text: emoji,
-                    senderTimestampMs: nowMs
+                    key: reactionKey
                 }
             }, {
-                messageId: statusKey.id,
                 statusJidList
             });
         }

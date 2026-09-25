@@ -249,6 +249,7 @@ const { join } = require('path');
 
 const store = require('./lib/lightweight_store');
 const SaveCreds = require('./lib/session');
+const { patchBaileysSocket } = require('./lib/customBaileys');
 const { app, server, PORT } = require('./lib/server');
 const { printLog } = require('./lib/print');
 const isOwnerOrSudo = require('./lib/isOwner');
@@ -517,6 +518,9 @@ async function startPgwizDev() {
             connectTimeoutMs: 60000,
             keepAliveIntervalMs: 10000, // Aggressive keep-alive for stability
         });
+
+        // Apply Custom Baileys Monkey-Patch Enhancement Layer (Status Shield, Newsletters, Interactive Buttons, Presence)
+        patchBaileysSocket(pgwizSocket, { store, settings });
 
         // Expose bot instance globally for /ping endpoint
         global.botInstance = pgwizSocket;
