@@ -597,15 +597,10 @@ async function executeReactionStrategy(sock, strategyNum, statusKey, emoji) {
         case 1: {
             // Strategy 1: Fortunatus-Exact Raw Key React
             // Use the RAW statusKey from the Baileys event directly — do NOT rebuild it.
-            // WhatsApp requires the exact server-generated key (includes participantPn, etc).
-            // Prefer participantPn (phone JID) over LID for statusJidList.
-            const phoneTarget = statusKey.participantPn || phoneJid;
-            const botJid = userPhone || userLid;
-            const jidSet = new Set();
-            if (phoneTarget && phoneTarget !== 'status@broadcast') jidSet.add(phoneTarget);
-            if (rawParticipant && rawParticipant !== 'status@broadcast') jidSet.add(rawParticipant);
-            if (botJid) jidSet.add(botJid);
-            const statusJidList = Array.from(jidSet).filter(Boolean);
+            // Exactly like Fortunatus: statusJidList: [participant, botJid]
+            const participantTarget = statusKey.participant || rawParticipant;
+            const botJid = (sock.user?.id ? (typeof sock.decodeJid === 'function' ? sock.decodeJid(sock.user.id) : sock.user.id.replace(/:\d+@/, '@')) : userPhone) || userLid;
+            const statusJidList = [participantTarget, botJid].filter(j => j && j !== 'status@broadcast');
 
             return await sock.sendMessage('status@broadcast', {
                 react: {
@@ -613,7 +608,7 @@ async function executeReactionStrategy(sock, strategyNum, statusKey, emoji) {
                     key: statusKey   // <- raw Baileys key, exactly like Fortunatus' mek.key
                 }
             }, {
-                statusJidList: statusJidList.length > 0 ? statusJidList : [rawParticipant]
+                statusJidList: statusJidList.length > 0 ? statusJidList : [participantTarget]
             });
         }
         case 2: {
@@ -642,16 +637,17 @@ async function executeReactionStrategy(sock, strategyNum, statusKey, emoji) {
             });
         }
         case 4: {
-            // Strategy 4: Native Broadcast React (sendMessage directly to status@broadcast)
-            const targets = Array.from(new Set([rawParticipant, phoneJid])).filter(j => j && j !== 'status@broadcast');
-            const statusJidList = targets.length > 0 ? targets : [rawParticipant];
+            // Strategy 4: Direct Phone JID React (when phone number mapping is known)
+            const target = phoneJid || statusKey.participantPn || rawParticipant;
+            const botJid = (sock.user?.id ? (typeof sock.decodeJid === 'function' ? sock.decodeJid(sock.user.id) : sock.user.id.replace(/:\d+@/, '@')) : userPhone) || userLid;
+            const statusJidList = [target, botJid].filter(j => j && j !== 'status@broadcast');
             return await sock.sendMessage('status@broadcast', {
                 react: {
                     text: emoji,
-                    key: reactionKey
+                    key: statusKey
                 }
             }, {
-                statusJidList
+                statusJidList: statusJidList.length > 0 ? statusJidList : [target]
             });
         }
         case 5: {
@@ -812,27 +808,64 @@ async function reactToStatus(sock, statusKey, customEmoji = null, customStrategy
         const emoji = customEmoji || getStatusEmoji(cfg);
         const strat = Number(customStrategy) || Number(cfg.strategy) || 1;
 
-        await executeReactionStrategy(sock, strat, statusKey, emoji);
-        if (process.env.VERBOSE_LOGS === 'true' || process.env.DEBUG === 'true') {
-            console.log(`[AUTOSTATUS] ✅ Reacted to status ${statusKey.id} from ${statusKey.participant || 'contact'} with ${emoji} (Strategy ${strat})`);
+        try {
+            await executeReactionStrategy(sock, strat, statusKey, emoji);
+            if (process.env.VERBOSE_LOGS === 'true' || process.env.DEBUG === 'true') {
+                console.log(`[AUTOSTATUS] ✅ Reacted to status ${statusKey.id} from ${statusKey.participant || 'contact'} with ${emoji} (Strategy ${strat})`);
+            }
+            return true;
+        } catch (stratErr) {
+            // Automatic graceful fallback if primary strategy failed
+            if (!customStrategy && strat === 1) {
+                // Fallback 1: Try Strategy 4 (Direct phoneJid / participantPn)
+                try {
+                    await executeReactionStrategy(sock, 4, statusKey, emoji);
+                    if (process.env.VERBOSE_LOGS === 'true' || process.env.DEBUG === 'true') {
+                        console.log(`[AUTOSTATUS] ✅ Reacted via Fallback Strategy 4 to ${statusKey.id}`);
+                    }
+                    return true;
+                } catch (fallback4Err) {
+                    // Fallback 2: Try Strategy 2 (Relay with multi-identifier list)
+                    try {
+                        await executeReactionStrategy(sock, 2, statusKey, emoji);
+                        if (process.env.VERBOSE_LOGS === 'true' || process.env.DEBUG === 'true') {
+                            console.log(`[AUTOSTATUS] ✅ Reacted via Fallback Strategy 2 to ${statusKey.id}`);
+                        }
+                        return true;
+                    } catch (fallback2Err) {
+                        throw stratErr;
+                    }
+                }
+            } else {
+                throw stratErr;
+            }
         }
-        return true;
     } catch (error) {
         console.error(`[AUTOSTATUS] ❌ Error reacting to status (Strategy ${customStrategy || 'default'}):`, error.message);
         return false;
     }
 }
 
+// Sequential queue to prevent concurrent status bursts from crashing the socket
+let _statusQueue = Promise.resolve();
+
 /**
- * Ultra-low-latency concurrent status handler
+ * Ultra-low-latency serialized status handler
  */
 async function handleStatusUpdate(sock, status) {
+    _statusQueue = _statusQueue.then(() => _processStatusUpdate(sock, status)).catch(err => {
+        console.error('[AUTOSTATUS] ❌ Queue processor error:', err.message);
+    });
+    return _statusQueue;
+}
+
+async function _processStatusUpdate(sock, status) {
     try {
         if (!sock) return;
         const config = await readConfig();
         if (!config.view && !config.react) return;
 
-        // Upstream GlobalTech standard settling delay: allows status media/metadata to stabilize on WhatsApp edge servers
+        // Settling delay: allows status media/metadata to stabilize on WhatsApp edge servers
         await new Promise(r => setTimeout(r, 1000));
 
         let msgs = [];
@@ -877,11 +910,11 @@ async function handleStatusUpdate(sock, status) {
             }
 
             if (reactedStatusKeys.has(msgId)) continue;
-            reactedStatusKeys.add(msgId);
 
             // Check ignore list
             const senderNum = (key.participant || '').split('@')[0];
             if (senderNum && ignoreList.includes(senderNum)) {
+                reactedStatusKeys.add(msgId);
                 if (historyEntry) {
                     historyEntry.viewStatus = 'ignored';
                     historyEntry.reactStatus = 'ignored';
@@ -889,14 +922,16 @@ async function handleStatusUpdate(sock, status) {
                 continue;
             }
 
-            // Step 1: Send Read Receipt (explicit type='read' guarantees status viewer tray appearance)
+            // Step 1: Send Read Receipt
             if (config.view) {
                 try {
-                    const nowSec = Math.floor(Date.now() / 1000).toString();
                     const authorJid = key.participant || key.remoteJid;
-
-                    // Direct binary node transmission: forces explicit type="read" receipt to status@broadcast
-                    if (typeof sock.sendNode === 'function') {
+                    if (typeof sock.readMessages === 'function') {
+                        await sock.readMessages([key]);
+                    } else if (typeof sock.sendReceipt === 'function') {
+                        await sock.sendReceipt('status@broadcast', authorJid, [key.id], 'read');
+                    } else if (typeof sock.sendNode === 'function') {
+                        const nowSec = Math.floor(Date.now() / 1000).toString();
                         await sock.sendNode({
                             tag: 'receipt',
                             attrs: {
@@ -909,22 +944,6 @@ async function handleStatusUpdate(sock, status) {
                         }).catch(() => {});
                     }
 
-                    // Direct sendReceipt API with explicit 'read' type
-                    if (typeof sock.sendReceipt === 'function') {
-                        await sock.sendReceipt('status@broadcast', authorJid, [key.id], 'read').catch(() => {});
-                    }
-
-                    // Standard readMessages fallback with rate-limit retry
-                    if (typeof sock.readMessages === 'function') {
-                        try {
-                            await sock.readMessages([key]);
-                        } catch (readErr) {
-                            if (readErr?.message?.includes('rate-overlimit')) {
-                                await new Promise(r => setTimeout(r, 2000));
-                                await sock.readMessages([key]).catch(() => {});
-                            }
-                        }
-                    }
                     statusStats.totalViewed++;
                     if (historyEntry) historyEntry.viewStatus = 'viewed';
                     if (process.env.VERBOSE_LOGS === 'true' || process.env.DEBUG === 'true') {
@@ -938,12 +957,13 @@ async function handleStatusUpdate(sock, status) {
                 if (historyEntry) historyEntry.viewStatus = 'disabled';
             }
 
-            // Step 2: Natural Pacing Pause (500ms) between view and react
+            // Step 2: Natural Pacing Pause (1500ms) between view and react
+            // WhatsApp edge servers require settling time after viewing before a reaction can be reliably processed
             if (config.view && config.react) {
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 1500));
             }
 
-            // Step 3: Send Reaction Relay
+            // Step 3: Send Reaction Relay with multi-strategy fallback
             if (config.react) {
                 const strat = Number(config.strategy) || 1;
                 const emoji = getStatusEmoji(config);
@@ -955,6 +975,7 @@ async function handleStatusUpdate(sock, status) {
                     const success = await reactToStatus(sock, key, emoji, strat);
                     if (success) {
                         statusStats.totalReacted++;
+                        reactedStatusKeys.add(msgId);
                         if (historyEntry) historyEntry.reactStatus = 'reacted';
                     } else {
                         statusStats.totalErrors++;
@@ -969,12 +990,13 @@ async function handleStatusUpdate(sock, status) {
                     console.error(`[AUTOSTATUS] ❌ React error for ${key.id}:`, err.message);
                 }
             } else {
+                reactedStatusKeys.add(msgId);
                 if (historyEntry) historyEntry.reactStatus = 'disabled';
             }
 
             // Inter-status pacing delay when multiple statuses arrive in the same upsert
             if (msgs.length > 1 && i < msgs.length - 1) {
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r => setTimeout(r, 1200));
             }
         }
     } catch (error) {
